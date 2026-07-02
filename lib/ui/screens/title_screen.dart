@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../services/audio_service.dart';
+import '../../services/firebase_service.dart';
 import '../../services/save_service.dart';
 import '../../theme.dart';
 import '../widgets/notebook.dart';
 import 'death_note_screen.dart';
 import 'leaderboard_screen.dart';
 import 'level_select_screen.dart';
+import 'profile_screen.dart';
 
 class TitleScreen extends StatefulWidget {
   const TitleScreen({super.key});
@@ -90,6 +92,15 @@ class _TitleScreenState extends State<TitleScreen> {
                         onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
                                 builder: (_) => const LeaderboardScreen()))),
+                    InkButton(
+                        label: FirebaseService.instance.isSignedIn
+                            ? 'Profile ✓'
+                            : 'Sign in',
+                        onTap: () async {
+                          await Navigator.of(context).push(MaterialPageRoute(
+                              builder: (_) => const ProfileScreen()));
+                          if (mounted) setState(() {});
+                        }),
                   ],
                 ),
               ],

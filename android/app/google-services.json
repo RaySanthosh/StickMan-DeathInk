@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "192172141421",
+    "project_id": "stickman-deadink",
+    "storage_bucket": "stickman-deadink.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:192172141421:android:1cce12a4b3f92d48a60864",
+        "android_client_info": {
+          "package_name": "com.santhosh.death_note"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "192172141421-knvo35sk2vud00vfum8gmpq58chnpd9n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDiscnDPPCpKUFpbxgR2INwkLO-ex0v14Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "192172141421-knvo35sk2vud00vfum8gmpq58chnpd9n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

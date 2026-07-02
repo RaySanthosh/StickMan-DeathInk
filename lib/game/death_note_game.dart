@@ -222,7 +222,6 @@ class DeathNoteGame extends FlameGame with KeyboardEvents {
     );
     FirebaseService.instance
         .submitScore(level: levelIndex, timeMs: timeMs, deaths: deaths);
-    FirebaseService.instance.pushProgress();
     audio.win();
     onCompleteOverlay(LevelResult(
       levelIndex: levelIndex,

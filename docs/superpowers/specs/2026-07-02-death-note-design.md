@@ -62,9 +62,41 @@ fixed-resolution camera 960×540 following the player, clamped to level bounds.
 - `AudioService`: synthesized WAV SFX (jump, death, checkpoint, win, click) via
   flame_audio; respects sound toggle.
 
+## Accounts, ranking & FCM (revision 2026-07-02b, project `stickman-deadink`)
+Two-tier identity:
+- **Tier 1 — anonymous (no sign-in):** on first launch, silent
+  `signInAnonymously`. Immediately write `users/{uid}` with `isAnonymous:true`
+  and the FCM token. Player can play everything; scores stay local only.
+- **Tier 2 — Google upgrade:** a "Sign in with Google" action calls
+  `linkWithCredential` (preserves the anon uid and all progress), captures the
+  **email only**, then a **name + country selector** screen fills the profile.
+  Only Tier-2 players appear on the global leaderboard.
+
+Firestore data model:
+- `users/{uid}`: `isAnonymous`, `email?`, `name?`, `country?` (ISO code),
+  `fcmToken?`, `createdAt`, `updatedAt`.
+- `scores/{uid}_{level}`: `uid`, `level` (0–9), `deaths`, `timeMs`, `name`,
+  `country`, `updatedAt`. One row per player per chapter.
+
+Ranking:
+- The local death log (witty causes) is **never uploaded** — only `deaths` and
+  `timeMs` per chapter go to the cloud.
+- **Keep-best**: a score row is overwritten only when the new run has fewer
+  deaths (tie-break faster `timeMs`).
+- Board query per chapter: `scores where level == N orderBy deaths, timeMs`,
+  showing name + country flag.
+
+FCM: `firebase_messaging` — request notification permission (Android 13+
+`POST_NOTIFICATIONS`), store token on the user doc at anon sign-in, refresh on
+rotation.
+
+Dependencies to add: `firebase_messaging`, `google_sign_in` (pin ^6.2.x),
+country list bundled in-app (no extra dependency). Security rules: owner-only
+`users`, signed-in read + own-row write on `scores` (see README).
+
 ## Error handling
 - No Firebase config / no network → all cloud features hidden or show
-  "offline" note; game never blocks.
+  "offline" note; game never blocks. Anonymous play is always available.
 - Save writes are fire-and-forget with try/catch; corrupted prefs reset safely.
 
 ## Testing

@@ -109,6 +109,28 @@ class SaveService {
   String get nickname => _prefs.getString('nickname') ?? '';
   Future<void> setNickname(String value) => _prefs.setString('nickname', value);
 
+  // ---- account profile (mirrors the cloud users/{uid} doc) ----
+  bool get isSignedIn => _prefs.getBool('signedIn') ?? false;
+  String get email => _prefs.getString('email') ?? '';
+  String get country => _prefs.getString('country') ?? '';
+
+  Future<void> setProfile({
+    required String name,
+    required String country,
+    required String email,
+  }) async {
+    await _prefs.setString('nickname', name);
+    await _prefs.setString('country', country);
+    await _prefs.setString('email', email);
+    await _prefs.setBool('signedIn', true);
+  }
+
+  Future<void> clearProfile() async {
+    await _prefs.setBool('signedIn', false);
+    await _prefs.remove('email');
+    await _prefs.remove('country');
+  }
+
   // ---- cloud sync helpers ----
   Map<String, dynamic> progressSnapshot(int levelCount) => {
         'unlocked': unlocked,

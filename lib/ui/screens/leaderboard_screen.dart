@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/countries.dart';
 import '../../game/levels_data.dart';
 import '../../game/scoring.dart';
 import '../../services/firebase_service.dart';
@@ -89,8 +90,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         itemCount: scores.length,
                         itemBuilder: (context, i) {
                           final s = scores[i];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
+                          final flag = countryByCode(s.country)?.flag ?? '🏳️';
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: s.isMe
+                                ? BoxDecoration(
+                                    color: InkPalette.gold
+                                        .withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(6),
+                                  )
+                                : null,
                             child: Row(
                               children: [
                                 SizedBox(
@@ -101,11 +112,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                               ? InkPalette.gold
                                               : InkPalette.ink)),
                                 ),
+                                Text('$flag ', style: hand(22)),
                                 Expanded(
-                                    child:
-                                        Text(s.nickname, style: hand(22))),
-                                Text(
-                                    '${formatTime(s.timeMs)}  ·  ☠ ${s.deaths}',
+                                    child: Text(s.isMe ? '${s.name} (you)' : s.name,
+                                        style: hand(22))),
+                                Text('☠ ${s.deaths}  ·  ${formatTime(s.timeMs)}',
                                     style:
                                         hand(20, color: InkPalette.inkFaded)),
                               ],
