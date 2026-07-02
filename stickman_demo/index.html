@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Athletic Stickman — procedural animation demo</title>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #e9eef4; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+/* =========================================================================
+   ATHLETIC STICKMAN — single-file procedural animation demo
+   Sections: constants/helpers · input · physics & state machine ·
+             pose generation · blending · skeleton FK · particles ·
+             camera · rendering · main loop
+   ========================================================================= */
+
+// ------------------------------------------------------------ constants ---
+const UNIT = 32;                    // 1 unit = 32 px
+const GRAVITY = 20;                 // units/s^2
+const MAX_FALL = 20;
+const ACCEL = 25, DECEL = 30, AIR_CONTROL = 0.6;
+const SLIDE_FRICTION = 2;
+const WALK_SPD = 3, RUN_SPD = 7, SPRINT_SPD = 9, SLIDE_SPD = 10;
+const JUMP_V = 8, DJUMP_V = 9;
+const COYOTE = 0.10, BUFFER = 0.12;
+const STEP = 1 / 120;               // fixed-timestep physics
+
+// skeleton proportions (units)
+const HEAD_R = 0.5, TORSO = 2.2, UARM = 1.1, LARM = 1.0, HAND = 0.3;
+const THIGH = 1.5, SHIN = 1.5;
+const LINE_W = 0.14 * UNIT;
+
+// Joint limits (deg). Hip/shoulder measured from straight-down vertical,
+// + = forward. Knee/elbow are BEND amounts (0 = straight, interior = 180 -
+// bend). Elbow interior 155..25 and knee interior never past ~170 — joints
+// never fully lock.
+const SH_MIN = -60, SH_MAX = 170;
+const EL_MIN = 25,  EL_MAX = 155;
+const HIP_MIN = -30, HIP_MAX = 130;
+const KNEE_MIN = 10, KNEE_MAX = 145;
+
+const rad = d => d * Math.PI / 180;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// smooth looping keyframe sampler (4 keys per cycle, cosine-eased)
+function cyc(keys, ph) {
+  const n = keys.length;
+  const x = (((ph % 1) + 1) % 1) * n;
+  const i = Math.floor(x) % n, t = x - Math.floor(x);
+  const s = 0.5 - 0.5 * Math.cos(t * Math.PI);
+  return keys[i] * (1 - s) + keys[(i + 1) % n] * s;
+}
+
+// ---------------------------------------------------------------- input ---
+const keys = {};
+let jumpQueued = false;
+addEventListener('keydown', e => {
+  if (e.repeat) return;
+  keys[e.code] = true;
+  if (e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') jumpQueued = true;
+  if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+});
+addEventListener('keyup', e => {
+  keys[e.code] = false;
+  // variable jump height: releasing early cuts upward velocity in half
+  if ((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && P.vy > 0) P.vy *= 0.5;
+});
+const inLeft   = () => keys.KeyA || keys.ArrowLeft;
+const inRight  = () => keys.KeyD || keys.ArrowRight;
+const inDown   = () => keys.KeyS || keys.ArrowDown;
+const inSprint = () => keys.ShiftLeft || keys.ShiftRight;
+
+// --------------------------------------------------------------- player ---
+// World: x in units, py = pelvis height above ground (units, up = +).
+const P = {
+  x: 0, py: 3, vx: 0, vy: 0,
+  grounded: true, face: 1,
+  state: 'idle', stateT: 0,
+  coyote: 0, buffer: 0, canDouble: true, holdT: 0,
+  gait: 0,           // stride cycle, 1 = one full left+right step pair
+  impact: 0,         // landing impact speed (drives crouch depth)
+  scaleY: 1,         // squash & stretch
+  slideDir: 1,
+  breath: 0,
+};
+
+// current (smoothed) pose and its blend time-constant
+const pose = { lean: 3, hipA: 5, kneeA: 15, hipB: -5, kneeB: 15,
+               shA: 10, elA: 25, shB: 8, elB: 25, lift: 0 };
+let blendTau = 0.08;
+const TAUS = { // spec blend durations -> exponential tau ~ duration / 3
+  'idle>walk': .05, 'walk>idle': .05, 'walk>run': .066, 'run>walk': .066,
+  'run>prep': .027, 'sprint>prep': .027, 'air>land': .04,
+  'run>slide': .017, 'sprint>slide': .017, 'slide>land': .06,
+  'slide>idle': .06, 'slide>run': .06,
+};
+function setState(s) {
+  if (P.state === s) return;
+  blendTau = TAUS[P.state + '>' + s] || 0.08;
+  P.state = s; P.stateT = 0;
+}
+
+// --------------------------------------- physics & state machine (120 Hz) -
+function stepPlayer(dt) {
+  P.stateT += dt;
+  P.breath += dt;
+  const dir = (inRight() ? 1 : 0) - (inLeft() ? 1 : 0);
+  const sliding = P.state === 'slide';
+  const prep = P.state === 'prep';
+
+  if (dir !== 0 && !sliding) P.face = dir;
+
+  // --- horizontal movement ---
+  if (sliding) {
+    const d = SLIDE_FRICTION * dt;
+    P.vx = Math.abs(P.vx) <= d ? 0 : P.vx - Math.sign(P.vx) * d;
+  } else {
+    if (dir !== 0) P.holdT += dt; else P.holdT = 0;
+    let top = WALK_SPD + (RUN_SPD - WALK_SPD) * clamp(P.holdT / 0.6, 0, 1);
+    if (inSprint()) top = SPRINT_SPD;
+    if (dir === 0 || prep) {
+      const d = DECEL * (P.grounded ? 1 : AIR_CONTROL * 0.4) * dt;
+      P.vx = Math.abs(P.vx) <= d ? 0 : P.vx - Math.sign(P.vx) * d;
+    } else {
+      const a = ACCEL * (P.grounded ? 1 : AIR_CONTROL) *
+                (dir * P.vx < 0 ? DECEL / ACCEL : 1); // reversing brakes harder
+      const target = dir * top;
+      P.vx = P.vx < target ? Math.min(P.vx + a * dt, target)
+                           : Math.max(P.vx - a * dt, target);
+    }
+  }
+
+  // --- jumping: coyote time + input buffering ---
+  P.coyote = P.grounded ? COYOTE : Math.max(0, P.coyote - dt);
+  if (jumpQueued) { P.buffer = BUFFER; jumpQueued = false; }
+  else P.buffer = Math.max(0, P.buffer - dt);
+
+  if (P.buffer > 0) {
+    if ((P.grounded || P.coyote > 0) && !prep) {
+      P.buffer = 0;
+      if (sliding) launch();               // slide-jump: no anticipation crouch
+      else setState('prep');               // 0.08s crouch, then takeoff
+    } else if (!P.grounded && P.coyote <= 0 && P.canDouble) {
+      P.buffer = 0; P.canDouble = false;
+      P.vy = DJUMP_V;
+      setState('dj');
+      spawnRing(P.x, P.py - fkLowest(pose));
+    }
+  }
+  if (prep && P.stateT >= 0.08) launch();
+
+  // --- vertical ---
+  if (!P.grounded) {
+    P.vy -= GRAVITY * dt;
+    if (P.vy < -MAX_FALL) P.vy = -MAX_FALL;
+    P.py += P.vy * dt;
+  }
+  P.x += P.vx * dt;
+
+  // --- grounding: pelvis height rides on the pose's lowest foot, so bent
+  // knees naturally lower the centre of gravity and no foot ever floats ---
+  const ext = fkLowest(pose);
+  if (!P.grounded && P.vy <= 0 && P.py <= ext) {
+    P.grounded = true; P.canDouble = true;
+    P.impact = -P.vy; P.vy = 0;
+    P.scaleY = clamp(1 - P.impact / 60, 0.90, 0.97);   // squash on landing
+    setState('land');
+    spawnDust(P.x, 0, Math.min(10, 3 + P.impact * 0.5), 1);
+  }
+  if (P.grounded) P.py = ext + pose.lift;
+
+  // --- grounded state selection ---
+  const spd = Math.abs(P.vx);
+  if (P.grounded && !prep) {
+    if (P.state === 'land') {
+      const dur = 0.12 + 0.1 * clamp(P.impact / MAX_FALL, 0, 1);
+      if (P.stateT >= dur) setState(spd < 0.2 ? 'idle' : 'run');
+    } else if (sliding) {
+      if (P.stateT >= 0.5 || spd < 3) {
+        P.impact = 4;                                    // recover crouch depth
+        setState(dir !== 0 && spd > 2 ? 'run' : 'land');
+      }
+      if ((P.stateT * 30 | 0) !== ((P.stateT - dt) * 30 | 0))
+        spawnDust(P.x - P.face * 0.8, 0, 1, 0.6);        // slide dust trail
+    } else {
+      if (inDown() && spd > 5) {
+        P.slideDir = Math.sign(P.vx) || P.face;
+        P.vx = P.slideDir * Math.min(SLIDE_SPD, spd + 1.5);
+        setState('slide');
+      }
+      else if (spd < 0.2) setState('idle');
+      else if (spd < 3.5) setState('walk');
+      else if (spd > 7.6 && inSprint()) setState('sprint');
+      else setState('run');
+    }
+  }
+  if (!P.grounded && P.state !== 'dj' && P.state !== 'air') setState('air');
+  if (P.state === 'dj' && P.stateT > 0.15) setState('air');
+
+  // --- gait phase advances with distance travelled: zero foot sliding ---
+  if (P.grounded && spd > 0.3 && !sliding && !prep && P.state !== 'land') {
+    const stride = lerp(1.35, 2.16,
+        clamp((spd - WALK_SPD) / (SPRINT_SPD - WALK_SPD), 0, 1));
+    const prevG = P.gait;
+    P.gait += spd * dt / stride;
+    // each half cycle = one footfall
+    if (spd > 4 && (P.gait * 2 | 0) !== (prevG * 2 | 0))
+      spawnDust(P.x - P.face * 0.3, 0, 2, 0.7);
+  }
+
+  // sprint speed lines
+  if (spd > 8 && Math.random() < dt * 30)
+    spawnStreak(P.x, 0.5 + Math.random() * 3);
+
+  // squash/stretch recovers toward 1
+  P.scaleY += (1 - P.scaleY) * (1 - Math.exp(-10 * dt));
+
+  // --- pose blending: ease current pose toward the state's target ---
+  const t = targetPose();
+  const k = 1 - Math.exp(-dt / blendTau);
+  for (const key in pose) pose[key] += (t[key] - pose[key]) * k;
+}
+
+function launch() {
+  P.vy = JUMP_V; P.grounded = false; P.coyote = 0;
+  P.scaleY = 1.07;                                      // stretch at takeoff
+  setState('air');
+}
+
+// ------------------------------------------------------ pose generation ---
+// Gait keyframes over one cycle: [contact, passing, contact-mirror, swing].
+const W = { hip: [30, 0, -20, 10],  knee: [15, 8, 30, 40],
+            sh: [-22, 0, 22, 0],    el: [34, 30, 26, 30] };
+const R = { hip: [45, 0, -40, 30],  knee: [30, 18, 95, 120],
+            sh: [-50, 0, 55, 0],    el: [112, 100, 88, 100] };
+
+function targetPose() {
+  const spd = Math.abs(P.vx);
+  const t = { lean: 3, hipA: 5, kneeA: 15, hipB: -5, kneeB: 15,
+              shA: 10, elA: 25, shB: 8, elB: 25, lift: 0 };
+
+  switch (P.state) {
+    case 'idle': {                       // 1s loop: breathing + tiny arm sway
+      const b = Math.sin(P.breath * 2 * Math.PI);
+      t.lean = 3 + b * 0.5;
+      t.shA = 10 + b * 1.5; t.elA = 25 + b * 3;
+      t.shB = 8 - b * 1.5;  t.elB = 25 + b * 3;
+      break;
+    }
+    case 'walk': case 'run': case 'sprint': {
+      const r = clamp((spd - WALK_SPD) / (RUN_SPD - WALK_SPD), 0, 1);
+      const sp = P.state === 'sprint' ? 1 : 0;
+      const amp = clamp(spd / WALK_SPD, 0.4, 1) * (1 + sp * 0.12);
+      const g = P.gait;
+      const mix = (w, rn, off) => lerp(cyc(w, g + off), cyc(rn, g + off), r) * amp;
+      t.hipA  = mix(W.hip, R.hip, 0);   t.hipB = mix(W.hip, R.hip, 0.5);
+      t.kneeA = lerp(cyc(W.knee, g), cyc(R.knee, g), r);
+      t.kneeB = lerp(cyc(W.knee, g + .5), cyc(R.knee, g + .5), r);
+      t.shA   = mix(W.sh, R.sh, 0);     t.shB  = mix(W.sh, R.sh, 0.5);
+      // elbows tighten with speed: ~150deg interior walking -> 65-100 sprinting
+      t.elA   = lerp(cyc(W.el, g), cyc(R.el, g), r) + sp * 8;
+      t.elB   = lerp(cyc(W.el, g + .5), cyc(R.el, g + .5), r) + sp * 8;
+      t.lean  = lerp(5, 12, r) + sp * 4;
+      // head bob: walk ~3% of body height, run ~10%; the flight term lifts
+      // the whole body so both feet leave the ground ~25% of the run cycle
+      const bob = Math.cos(g * 4 * Math.PI) * lerp(0.05, 0.16, r);
+      const flight = Math.max(0, -Math.cos(g * 4 * Math.PI)) * 0.22 * r;
+      t.lift = bob * 0.4 + flight;
+      break;
+    }
+    case 'prep':                         // anticipation: load knees, arms back
+      t.lean = 20; t.hipA = 40; t.kneeA = 100; t.hipB = 30; t.kneeB = 95;
+      t.shA = -45; t.elA = 60; t.shB = -40; t.elB = 65;
+      break;
+    case 'air': {
+      const tilt = clamp(P.vx * P.face * 1.2, -12, 12); // lean with velocity
+      if (P.vy > 0) {                    // takeoff -> apex
+        const u = clamp(1 - P.vy / JUMP_V, 0, 1);
+        t.lean = lerp(16, 4, u) + tilt;
+        t.hipA = lerp(10, 30, u);  t.kneeA = lerp(12, 50, u);
+        t.hipB = lerp(-15, -5, u); t.kneeB = lerp(10, 50, u);
+        t.shA = lerp(120, 80, u);  t.elA = lerp(40, 80, u);
+        t.shB = lerp(100, 65, u);  t.elB = lerp(45, 85, u);
+      } else {                           // falling: brace, arms come forward
+        const v = clamp(-P.vy / MAX_FALL, 0, 1);
+        t.lean = lerp(4, 16, v) + tilt;
+        t.hipA = 30; t.kneeA = 60; t.hipB = -12; t.kneeB = 65;
+        t.shA = lerp(80, 25, v); t.elA = lerp(80, 60, v);
+        t.shB = lerp(60, 15, v); t.elB = lerp(80, 60, v);
+      }
+      break;
+    }
+    case 'dj':                           // exaggerated tuck-and-reach
+      t.lean = 0;
+      t.hipA = 70; t.kneeA = 135; t.hipB = 55; t.kneeB = 140;
+      t.shA = 160; t.elA = 30; t.shB = 150; t.elB = 30;
+      break;
+    case 'land': {                       // crouch depth scales with impact
+      const d = clamp(P.impact / MAX_FALL, 0.25, 1);
+      t.lean = 4 + 20 * d;
+      t.hipA = 30 + 25 * d; t.kneeA = 40 + 35 * d;
+      t.hipB = -5 - 10 * d; t.kneeB = 35 + 30 * d;
+      t.shA = 30; t.elA = 60; t.shB = 20; t.elB = 65;
+      break;
+    }
+    case 'slide': {                      // low CoG, leaning back into it
+      const m = P.slideDir * P.face;
+      t.lean = -45 * m;
+      t.hipA = 20 * m; t.kneeA = 30;     // front leg extended
+      t.hipB = -30 * m; t.kneeB = 110;   // rear leg folded under
+      t.shA = 30 * m;  t.elA = 90;       // parkour arms: front out, back trailing
+      t.shB = -50 * m; t.elB = 90;
+      break;
+    }
+  }
+
+  // joint limits — knees & elbows keep at least a small bend, never locked
+  t.hipA = clamp(t.hipA, HIP_MIN, HIP_MAX);   t.hipB = clamp(t.hipB, HIP_MIN, HIP_MAX);
+  t.kneeA = clamp(t.kneeA, KNEE_MIN, KNEE_MAX); t.kneeB = clamp(t.kneeB, KNEE_MIN, KNEE_MAX);
+  t.shA = clamp(t.shA, SH_MIN, SH_MAX);       t.shB = clamp(t.shB, SH_MIN, SH_MAX);
+  t.elA = clamp(t.elA, EL_MIN, EL_MAX);       t.elB = clamp(t.elB, EL_MIN, EL_MAX);
+  return t;
+}
+
+// ---------------------------------------------------------- skeleton FK ---
+// Local space: pelvis at origin, +y DOWN, +x = facing (flipped at draw).
+function fk(p) {
+  const dir = a => ({ x: Math.sin(rad(a)), y: Math.cos(rad(a)) });
+  const up = { x: Math.sin(rad(p.lean)), y: -Math.cos(rad(p.lean)) };
+  const pelvis = { x: 0, y: 0 };
+  const neck = { x: up.x * TORSO, y: up.y * TORSO };
+  const shoulder = { x: up.x * TORSO * 0.92, y: up.y * TORSO * 0.92 };
+  const head = { x: neck.x + up.x * (HEAD_R + 0.18), y: neck.y + up.y * (HEAD_R + 0.18) };
+
+  const leg = (hip, knee) => {
+    const k = { x: dir(hip).x * THIGH, y: dir(hip).y * THIGH };
+    const f = { x: k.x + dir(hip - knee).x * SHIN, y: k.y + dir(hip - knee).y * SHIN };
+    return { k, f };
+  };
+  const arm = (sh, el) => {
+    const fa = dir(sh + el); // forearm folds forward of the upper arm
+    const e = { x: shoulder.x + dir(sh).x * UARM, y: shoulder.y + dir(sh).y * UARM };
+    const h = { x: e.x + fa.x * LARM, y: e.y + fa.y * LARM };
+    const t = { x: h.x + fa.x * HAND, y: h.y + fa.y * HAND };
+    return { e, h, t };
+  };
+  const A = leg(p.hipA, p.kneeA), B = leg(p.hipB, p.kneeB);
+  const aA = arm(p.shA, p.elA),  aB = arm(p.shB, p.elB);
+
+  // hands never drop below knee height
+  const kneeY = Math.min(A.k.y, B.k.y) + 0.25;
+  for (const pt of [aA.h, aA.t, aB.h, aB.t]) if (pt.y > kneeY) pt.y = kneeY;
+
+  return { pelvis, neck, shoulder, head, A, B, aA, aB,
+           lowest: Math.max(A.f.y, B.f.y) };
+}
+function fkLowest(p) { return fk(p).lowest; }
+
+// -------------------------------------------------------------- particles -
+const parts = [];
+function spawnDust(x, y, n, size) {
+  for (let i = 0; i < n; i++) parts.push({
+    type: 'dust', x: x + (Math.random() - 0.5) * 0.5, y: y + Math.random() * 0.2,
+    vx: (Math.random() - 0.5) * 2, vy: Math.random() * 1.6 + 0.4,
+    life: 1, r: (0.1 + Math.random() * 0.12) * size,
+  });
+}
+function spawnRing(x, y) { parts.push({ type: 'ring', x, y, life: 1, r: 0.2 }); }
+function spawnStreak(x, y) {
+  parts.push({ type: 'streak', x: x - P.face * (1 + Math.random() * 2), y,
+               life: 0.5, r: 0.5 + Math.random() });
+}
+function stepParticles(dt) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.life -= dt * (p.type === 'ring' ? 3 : p.type === 'streak' ? 3.5 : 1.8);
+    if (p.type === 'dust') { p.x += p.vx * dt; p.y += p.vy * dt; p.vy -= 3 * dt; }
+    if (p.type === 'ring') p.r += 4 * dt;
+    if (p.type === 'streak') p.x -= P.face * 6 * dt;
+    if (p.life <= 0) parts.splice(i, 1);
+  }
+}
+
+// ----------------------------------------------------------------- camera -
+const cam = { x: 0 };
+function stepCamera(dt) {
+  const target = P.x + P.vx * 0.35;             // look-ahead in move direction
+  cam.x += (target - cam.x) * (1 - Math.exp(-5 * dt));
+}
+
+// -------------------------------------------------------------- rendering -
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+addEventListener('resize', resize); resize();
+
+const COL = {
+  sky1: '#e7edf5', sky2: '#f7f9fc',
+  far: '#ccd8e4', mid: '#aebfd0',
+  ground: '#33404f', tick: '#93a5b7',
+  body: '#1c222c', bodyFar: 'rgba(28,34,44,0.45)',
+  dust: 'rgba(150,160,170,', ring: '#5b8dd6', streak: 'rgba(90,120,160,',
+  shadow: 'rgba(30,40,50,0.20)', hud: '#3a4655',
+};
+
+const groundScreenY = () => cv.height * 0.74;
+const sx = wx => (wx - cam.x) * UNIT + cv.width * 0.38;
+const sy = wyUp => groundScreenY() - wyUp * UNIT;
+
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, 0, cv.height);
+  g.addColorStop(0, COL.sky1); g.addColorStop(1, COL.sky2);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // parallax layers, world-anchored so scrolling is stable
+  const layer = (factor, spacingPx, fill, draw) => {
+    ctx.fillStyle = fill;
+    const off = cam.x * UNIT * factor;
+    const first = Math.floor((off - cv.width * 0.5) / spacingPx);
+    const last = Math.ceil((off + cv.width * 1.5) / spacingPx);
+    for (let i = first; i <= last; i++) draw(i * spacingPx - off + cv.width * 0.38, i);
+  };
+  layer(0.2, 260, COL.far, (x, i) => {          // distant soft shapes
+    const h = 55 + (Math.abs(i * 7919) % 55);
+    ctx.beginPath();
+    ctx.ellipse(x, groundScreenY() - 26, 140, h, 0, Math.PI, 0);
+    ctx.fill();
+  });
+  layer(0.5, 330, COL.mid, (x, i) => {          // mid hills
+    const h = 85 + (Math.abs(i * 104729) % 75);
+    ctx.beginPath();
+    ctx.ellipse(x, groundScreenY() + 12, 200, h, 0, Math.PI, 0);
+    ctx.fill();
+  });
+
+  // ground line with tick marks so speed is readable
+  ctx.strokeStyle = COL.ground; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, groundScreenY()); ctx.lineTo(cv.width, groundScreenY()); ctx.stroke();
+  ctx.strokeStyle = COL.tick; ctx.lineWidth = 2;
+  const spacing = 2; // units
+  const wxFirst = Math.floor((cam.x - cv.width * 0.38 / UNIT) / spacing) * spacing;
+  const wxLast = cam.x + cv.width / UNIT;
+  for (let wx = wxFirst; wx <= wxLast; wx += spacing) {
+    const x = sx(wx);
+    ctx.beginPath(); ctx.moveTo(x, groundScreenY()); ctx.lineTo(x, groundScreenY() + 8); ctx.stroke();
+  }
+}
+
+function drawParticles() {
+  for (const p of parts) {
+    if (p.type === 'dust') {
+      ctx.fillStyle = COL.dust + (p.life * 0.7).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(sx(p.x), sy(p.y), Math.max(0.5, p.r * UNIT * (1.6 - p.life * 0.6)), 0, 7);
+      ctx.fill();
+    } else if (p.type === 'ring') {
+      ctx.strokeStyle = COL.ring; ctx.globalAlpha = Math.max(0, p.life);
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(sx(p.x), sy(p.y), p.r * UNIT, p.r * UNIT * 0.4, 0, 0, 7);
+      ctx.stroke(); ctx.globalAlpha = 1;
+    } else {
+      ctx.strokeStyle = COL.streak + (p.life * 0.6).toFixed(3) + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sx(p.x), sy(p.y));
+      ctx.lineTo(sx(p.x) - P.face * p.r * UNIT, sy(p.y));
+      ctx.stroke();
+    }
+  }
+}
+
+function drawStickman() {
+  const S = fk(pose);
+  const px = sx(P.x);
+  const pelvisScreenY = sy(P.py);
+
+  // soft ellipse shadow, scaled by height off the ground
+  const h = Math.max(0, P.py - S.lowest);
+  const shScale = clamp(1 - h / 8, 0.25, 1);
+  ctx.fillStyle = COL.shadow;
+  ctx.globalAlpha = shScale;
+  ctx.beginPath();
+  ctx.ellipse(px, groundScreenY() + 4, UNIT * 1.1 * shScale, UNIT * 0.22 * shScale, 0, 0, 7);
+  ctx.fill(); ctx.globalAlpha = 1;
+
+  // squash & stretch about the lowest body point (visual only — bone
+  // lengths are never permanently distorted)
+  const baseY = pelvisScreenY + S.lowest * UNIT;
+  ctx.save();
+  ctx.translate(px, baseY);
+  ctx.scale(1.5 - P.scaleY * 0.5, P.scaleY);   // preserve apparent volume
+  ctx.scale(P.face, 1);                        // flip to face travel direction
+  ctx.translate(0, -S.lowest * UNIT);
+
+  const U = UNIT;
+  ctx.lineWidth = LINE_W; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const seg = (pts, paint) => {
+    ctx.strokeStyle = paint; ctx.beginPath();
+    ctx.moveTo(pts[0].x * U, pts[0].y * U);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * U, pts[i].y * U);
+    ctx.stroke();
+  };
+
+  // far limbs first, drawn fainter for depth
+  seg([S.pelvis, S.B.k, S.B.f, { x: S.B.f.x + 0.32, y: S.B.f.y }], COL.bodyFar);
+  seg([S.shoulder, S.aB.e, S.aB.h, S.aB.t], COL.bodyFar);
+
+  seg([S.pelvis, S.neck], COL.body);           // torso
+
+  seg([S.pelvis, S.A.k, S.A.f, { x: S.A.f.x + 0.32, y: S.A.f.y }], COL.body);
+  seg([S.shoulder, S.aA.e, S.aA.h, S.aA.t], COL.body);
+
+  // head: circle, nearly level with only subtle bob
+  ctx.strokeStyle = COL.body;
+  ctx.beginPath();
+  ctx.arc(S.head.x * U, S.head.y * U, HEAD_R * U, 0, 7);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawHUD() {
+  ctx.fillStyle = COL.hud;
+  ctx.font = '600 15px system-ui, sans-serif';
+  ctx.fillText('state: ' + P.state.toUpperCase(), 18, 30);
+  ctx.fillText('speed: ' + Math.abs(P.vx).toFixed(1) + ' u/s', 18, 52);
+  ctx.font = '13px system-ui, sans-serif';
+  ctx.globalAlpha = 0.75;
+  ctx.fillText('A/D or ◄ ► move · SHIFT sprint · SPACE/W jump (again in air = double jump) · S/▼ slide while fast', 18, cv.height - 20);
+  ctx.globalAlpha = 1;
+}
+
+// -------------------------------------------------------------- main loop -
+let last = performance.now(), acc = 0;
+function frame(now) {
+  let dt = (now - last) / 1000; last = now;
+  if (dt > 0.1) dt = 0.1;             // delta-time cap
+  acc += dt;
+  while (acc >= STEP) {               // fixed-timestep physics @ 120 Hz
+    stepPlayer(STEP);
+    stepParticles(STEP);
+    stepCamera(STEP);
+    acc -= STEP;
+  }
+  drawBackground();
+  drawParticles();
+  drawStickman();
+  drawHUD();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
