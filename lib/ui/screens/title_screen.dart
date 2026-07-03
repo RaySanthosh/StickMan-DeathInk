@@ -83,11 +83,6 @@ class _TitleScreenState extends State<TitleScreen> {
                         color: InkPalette.redInk,
                         onTap: _play),
                     InkButton(
-                        label: 'The Note',
-                        onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                                builder: (_) => const DeathNoteScreen()))),
-                    InkButton(
                         label: 'Leaderboard',
                         onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
@@ -104,6 +99,18 @@ class _TitleScreenState extends State<TitleScreen> {
                   ],
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            top: 10,
+            left: 12,
+            child: IconButton(
+              iconSize: 28,
+              color: InkPalette.ink,
+              tooltip: 'The Note',
+              icon: const Icon(Icons.menu_book),
+              onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DeathNoteScreen())),
             ),
           ),
           Positioned(

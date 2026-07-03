@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../game/levels_data.dart';
 import '../../game/scoring.dart';
+import '../../services/firebase_service.dart';
 import '../../services/save_service.dart';
 import '../../theme.dart';
 import '../widgets/notebook.dart';
 import 'game_screen.dart';
+import 'profile_screen.dart';
 
 class LevelSelectScreen extends StatefulWidget {
   const LevelSelectScreen({super.key});
@@ -15,6 +17,32 @@ class LevelSelectScreen extends StatefulWidget {
 }
 
 class _LevelSelectScreenState extends State<LevelSelectScreen> {
+  /// Chapter 1 is free; every chapter after it requires a Google account.
+  /// A guest tapping Chapter 2+ is routed through sign-in first.
+  Future<void> _openLevel(int index) async {
+    if (index >= 1 && !FirebaseService.instance.isSignedIn) {
+      final signedIn = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+      );
+      if (!mounted) return;
+      if (signedIn != true && !FirebaseService.instance.isSignedIn) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sign in to continue past Chapter 1.', style: hand(18)),
+          ),
+        );
+        setState(() {});
+        return;
+      }
+      setState(() {});
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => GameScreen(levelIndex: index)),
+    );
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final save = SaveService.instance;
@@ -53,13 +81,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                           _LevelCard(
                             index: i,
                             unlocked: i <= save.unlocked,
-                            onPlay: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                    builder: (_) => GameScreen(levelIndex: i)),
-                              );
-                              if (mounted) setState(() {});
-                            },
+                            onPlay: () => _openLevel(i),
                           ),
                     ],
                   ),

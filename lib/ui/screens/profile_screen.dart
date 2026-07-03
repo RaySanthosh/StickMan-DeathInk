@@ -67,6 +67,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Navigator.of(context).pop(true);
   }
 
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Erase your name?', style: caveat(32)),
+        content: Text(
+          'This permanently deletes your account, leaderboard scores and '
+          'profile. This cannot be undone.',
+          style: hand(18),
+        ),
+        actions: [
+          InkButton(
+            label: 'Cancel',
+            fontSize: 18,
+            onTap: () => Navigator.of(context).pop(false),
+          ),
+          InkButton(
+            label: 'Delete',
+            fontSize: 18,
+            color: InkPalette.redInk,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    final ok = await FirebaseService.instance.deleteAccount();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _email = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Account deleted.' : 'Could not delete — try again online.',
+          style: hand(18),
+        ),
+      ),
+    );
+    if (ok) Navigator.of(context).pop(true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final offline = !FirebaseService.instance.available;
@@ -153,6 +197,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: InkPalette.redInk,
                               onTap: _save,
                             ),
+                      if (_signedIn && !_busy) ...[
+                        const SizedBox(height: 24),
+                        TextButton(
+                          onPressed: _deleteAccount,
+                          child: Text('Delete account',
+                              style: hand(16, color: InkPalette.inkFaded)),
+                        ),
+                      ],
                     ],
                   ],
                 ),
