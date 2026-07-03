@@ -211,7 +211,7 @@ class DeathNoteGame extends FlameGame with KeyboardEvents {
     final stars = starRating(
       timeMs: timeMs,
       deaths: deaths,
-      parSeconds: levels[levelIndex].parSeconds,
+      parSeconds: levels[levelIndex].parSeconds * 0.8, // tighter 3-star bar
     );
     SaveService.instance.recordResult(
       level: levelIndex,

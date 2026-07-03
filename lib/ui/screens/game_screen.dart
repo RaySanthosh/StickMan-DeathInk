@@ -107,21 +107,8 @@ class _Hud extends StatefulWidget {
 }
 
 class _HudState extends State<_Hud> {
-  late final Timer _ticker;
-
-  @override
-  void initState() {
-    super.initState();
-    _ticker = Timer.periodic(
-        const Duration(milliseconds: 100), (_) => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _ticker.cancel();
-    super.dispose();
-  }
-
+  // No ticker here: the buttons are static, so the HUD builds once. Only the
+  // stats line ticks, in its own _HudStats widget below.
   @override
   Widget build(BuildContext context) {
     final game = widget.game;
@@ -149,10 +136,7 @@ class _HudState extends State<_Hud> {
           Positioned(
             top: 10,
             right: 14,
-            child: Text(
-              '☠ ${game.deaths}   ${formatTime(game.clock.elapsedMilliseconds)}',
-              style: hand(22, color: InkPalette.ink),
-            ),
+            child: _HudStats(game: game),
           ),
           // movement buttons
           Positioned(
@@ -210,6 +194,34 @@ class _HudState extends State<_Hud> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Only-this-rebuilds stats line: owns the 100ms tick so the buttons don't.
+class _HudStats extends StatefulWidget {
+  const _HudStats({required this.game});
+  final DeathNoteGame game;
+  @override
+  State<_HudStats> createState() => _HudStatsState();
+}
+
+class _HudStatsState extends State<_HudStats> {
+  late final Timer _ticker =
+      Timer.periodic(const Duration(milliseconds: 100), (_) => setState(() {}));
+
+  @override
+  void dispose() {
+    _ticker.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final game = widget.game;
+    return Text(
+      '☠ ${game.deaths}   ${formatTime(game.clock.elapsedMilliseconds)}',
+      style: hand(22, color: InkPalette.ink),
     );
   }
 }
@@ -381,19 +393,19 @@ class _CompleteOverlay extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (hasNext) ...[
-              InkButton(
-                  label: 'Next ▶',
-                  fontSize: 22,
-                  color: InkPalette.redInk,
-                  onTap: onNext),
-              const SizedBox(width: 14),
-            ],
-            InkButton(label: 'Replay', fontSize: 22, onTap: onReplay),
-            const SizedBox(width: 14),
             InkButton(label: 'Menu', fontSize: 22, onTap: onQuit),
+            const SizedBox(width: 14),
+            InkButton(label: 'Replay', fontSize: 22, onTap: onReplay),
           ],
         ),
+        if (hasNext) ...[
+          const SizedBox(height: 12),
+          InkButton(
+              label: 'Next Chapter ▶',
+              fontSize: 22,
+              color: InkPalette.redInk,
+              onTap: onNext),
+        ],
       ],
     );
   }

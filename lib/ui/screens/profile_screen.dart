@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/countries.dart';
 import '../../services/firebase_service.dart';
@@ -25,6 +28,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    // Name/country entry is far easier to type in portrait.
+    SystemChrome.setPreferredOrientations(
+        [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
     if (FirebaseService.instance.isSignedIn) {
       _email = SaveService.instance.email;
     }
@@ -32,6 +38,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
+    // Back to the game's landscape lock on the way out.
+    SystemChrome.setPreferredOrientations(
+        [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     _nameCtrl.dispose();
     super.dispose();
   }
@@ -141,8 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: hand(22)),
                       const SizedBox(height: 18),
                       _busy
-                          ? const CircularProgressIndicator(
-                              color: InkPalette.redInk)
+                          ? const _SignInLoader()
                           : InkButton(
                               label: '  Sign in with Google  ',
                               color: InkPalette.redInk,
@@ -190,8 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 22),
                       _busy
-                          ? const CircularProgressIndicator(
-                              color: InkPalette.redInk)
+                          ? const _SignInLoader()
                           : InkButton(
                               label: _signedIn ? 'Save' : 'Save & Join',
                               color: InkPalette.redInk,
@@ -213,6 +220,87 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Sign-in progress bar. Stays invisible for the first second (so quick
+/// sign-ins never flash a loader), then reveals a taunting percentage bar
+/// while the async work finishes.
+class _SignInLoader extends StatefulWidget {
+  const _SignInLoader();
+
+  @override
+  State<_SignInLoader> createState() => _SignInLoaderState();
+}
+
+class _SignInLoaderState extends State<_SignInLoader>
+    with SingleTickerProviderStateMixin {
+  static const _msgs = [
+    'Collecting lives data…',
+    'I guess I found you.',
+    "Let's see how you play this life.",
+    'Win me if you can.',
+  ];
+
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(seconds: 6))
+        ..forward();
+  bool _visible = false;
+  late final Timer _reveal = Timer(const Duration(seconds: 1), () {
+    if (mounted) setState(() => _visible = true);
+  });
+
+  @override
+  void dispose() {
+    _reveal.cancel();
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_visible) return const SizedBox(height: 4);
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final v = _c.value;
+        final pct = (v * 99).toInt();
+        final msg = _msgs[(v * _msgs.length).floor().clamp(0, _msgs.length - 1)];
+        return SizedBox(
+          width: 280,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(msg, style: hand(20, color: InkPalette.redInk)),
+              const SizedBox(height: 8),
+              Container(
+                height: 16,
+                decoration: BoxDecoration(
+                  color: InkPalette.paper,
+                  border: Border.all(color: InkPalette.ink, width: 2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: v.clamp(0.02, 1.0),
+                    child: Container(
+                      margin: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: InkPalette.redInk,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text('$pct%', style: hand(16, color: InkPalette.inkFaded)),
+            ],
+          ),
+        );
+      },
     );
   }
 }

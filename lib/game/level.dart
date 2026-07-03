@@ -109,16 +109,16 @@ class Level extends PositionComponent with HasGameReference<DeathNoteGame> {
             col: col,
             row: row,
             floorY: _floorYBelow(col, row),
-            triggerDist: 90 + rng.nextDouble() * 110,
-            fallSpeed: 550 + rng.nextDouble() * 300,
-            restDelay: 0.5 + rng.nextDouble() * 0.6,
+            triggerDist: 120 + rng.nextDouble() * 130, // senses you sooner
+            fallSpeed: 720 + rng.nextDouble() * 340, // slams faster
+            restDelay: 0.28 + rng.nextDouble() * 0.4, // shorter safe window
           );
         case '~':
           final platform = VanishingPlatform(
             col: col,
             row: row,
-            vanishDelay: 0.3 + rng.nextDouble() * 0.4,
-            respawnDelay: 1.6 + rng.nextDouble() * 1.0,
+            vanishDelay: 0.2 + rng.nextDouble() * 0.22, // crumbles quicker
+            respawnDelay: 1.9 + rng.nextDouble() * 1.1, // gone longer
           );
           _tiles[_key(col, row)] = platform;
           trap = platform;
@@ -139,7 +139,7 @@ class Level extends PositionComponent with HasGameReference<DeathNoteGame> {
             col: col,
             row: row,
             floorY: _floorYBelow(col, row),
-            period: 1.2 + rng.nextDouble() * 1.0,
+            period: 0.8 + rng.nextDouble() * 0.8, // cycles faster
             phase: rng.nextDouble() * 2.0,
           );
         default:
@@ -176,7 +176,7 @@ class Level extends PositionComponent with HasGameReference<DeathNoteGame> {
         horizontal: false,
         minPos: up * tileSize + Saw.radius,
         maxPos: (row + 1) * tileSize - Saw.radius,
-        speed: 90 + rng.nextDouble() * 100,
+        speed: 130 + rng.nextDouble() * 120,
         phase: rng.nextDouble(),
       );
     }
@@ -185,7 +185,7 @@ class Level extends PositionComponent with HasGameReference<DeathNoteGame> {
       horizontal: true,
       minPos: left * tileSize + Saw.radius,
       maxPos: (right + 1) * tileSize - Saw.radius,
-      speed: 90 + rng.nextDouble() * 110,
+      speed: 130 + rng.nextDouble() * 130,
       phase: rng.nextDouble(),
     );
   }
