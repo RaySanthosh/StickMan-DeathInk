@@ -2,21 +2,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Each player owns only their own profile.
+    // Each player owns only their own profile (email + FCM token live here).
     match /users/{uid} {
-      allow read:          if request.auth != null && request.auth.uid == uid;
+      allow read:           if request.auth != null && request.auth.uid == uid;
       allow create, update: if request.auth != null
                             && request.auth.uid == uid
                             && request.resource.data.uid == uid;
+      // Finding 1: without this, account deletion silently fails and PII lingers.
+      allow delete:         if request.auth != null && request.auth.uid == uid;
     }
 
-    // Leaderboard: anyone signed in can read; you may only write your own rows.
+    // Leaderboard: anyone signed in can read; you may only write your own rows,
+    // and only well-formed values (Finding 2: block oversized/garbage writes).
     match /scores/{scoreId} {
-      allow read:          if request.auth != null;
+      allow read:           if request.auth != null;
       allow create, update: if request.auth != null
                             && scoreId == request.auth.uid + '_' + string(request.resource.data.level)
+                            && request.resource.data.uid == request.auth.uid
+                            && request.resource.data.level is int
+                            && request.resource.data.level >= 0
+                            && request.resource.data.level < 100
+                            && request.resource.data.deaths is int
                             && request.resource.data.deaths >= 0
-                            && request.resource.data.timeMs > 0;
+                            && request.resource.data.deaths < 1000000
+                            && request.resource.data.timeMs is int
+                            && request.resource.data.timeMs > 0
+                            && request.resource.data.timeMs < 3600000
+                            && request.resource.data.name is string
+                            && request.resource.data.name.size() <= 24
+                            && request.resource.data.country is string
+                            && request.resource.data.country.size() <= 4;
+      // needed for account deletion to remove the player's own score rows
+      allow delete:         if request.auth != null
+                            && resource.data.uid == request.auth.uid;
     }
   }
 }

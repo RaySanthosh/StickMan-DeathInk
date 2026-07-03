@@ -242,6 +242,15 @@ class DartShooter extends PositionComponent
     _timer -= dt;
     if (_timer <= 0) {
       _timer = _period;
+      // Only fire when the player is roughly on-screen. Off-screen shooters
+      // used to spew darts nobody could see, piling up flying components and
+      // dragging the whole game down over a session.
+      final player = game.player;
+      final cx = position.x + size.x / 2;
+      final near = player.alive &&
+          (player.center.x - cx).abs() < 640 &&
+          (player.center.y - position.y).abs() < 320;
+      if (!near) return;
       final rng = math.Random();
       parent?.add(InkDart(
         start: position +
@@ -281,6 +290,7 @@ class InkDart extends Trap {
   }
 
   final Vector2 velocity;
+  double _life = 0; // hard cap so no dart can ever linger and accumulate
 
   @override
   List<String> get causes => DeathNoteGame.dartCauses;
@@ -288,10 +298,12 @@ class InkDart extends Trap {
   @override
   void update(double dt) {
     position += velocity * dt;
+    _life += dt;
     final level = game.level;
     final col = (position.x / level.tile).floor();
     final row = (position.y / level.tile).floor();
-    if (position.x < -50 ||
+    if (_life > 3.0 ||
+        position.x < -50 ||
         position.x > level.pixelWidth + 50 ||
         level.solidAt(col, row)) {
       removeFromParent();

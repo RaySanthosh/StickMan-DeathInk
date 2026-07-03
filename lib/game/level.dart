@@ -94,6 +94,12 @@ class Level extends PositionComponent with HasGameReference<DeathNoteGame> {
     for (final c in _trapComponents) {
       c.removeFromParent();
     }
+    // Darts fired by shooters are added to the level directly (not tracked in
+    // _trapComponents), so clear any still in flight from the last attempt —
+    // otherwise they pile up across deaths and progressively slow the game.
+    for (final dart in children.whereType<InkDart>().toList()) {
+      dart.removeFromParent();
+    }
     _trapComponents.clear();
     _tiles.clear();
 
