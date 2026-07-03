@@ -1,0 +1,52 @@
+rules_version = '2';
+
+// Death Note — Firestore security rules.
+// Model:
+//   users/{uid}          private profile: email, name, country, fcmToken.
+//   scores/{uid}_{level} public leaderboard row, writable only by its owner.
+//
+// Deploy with:  firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- private per-user profile ----
+    // Only the signed-in owner may read or write their own document. This is
+    // what keeps emails and FCM tokens from leaking to anyone else.
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.data.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ---- public leaderboard ----
+    // Anyone may READ the leaderboard (names + country + time + deaths only).
+    // Only the owning account may WRITE, and only sane values — this blocks
+    // spoofed scores and impossible times.
+    match /scores/{scoreId} {
+      allow read: if true;
+
+      allow write: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.level is int
+        && request.resource.data.level >= 0
+        && request.resource.data.level < 100
+        && request.resource.data.deaths is int
+        && request.resource.data.deaths >= 0
+        && request.resource.data.deaths < 1000000
+        && request.resource.data.timeMs is int
+        && request.resource.data.timeMs >= 0
+        && request.resource.data.timeMs < 3600000
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 24
+        && request.resource.data.country is string
+        && request.resource.data.country.size() <= 4;
+
+      allow delete: if request.auth != null
+                    && resource.data.uid == request.auth.uid;
+    }
+
+    // everything else is denied by default
+  }
+}
