@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../firebase_options.dart';
+import '../game/levels_data.dart';
 import 'messaging_service.dart';
 import 'save_service.dart';
 
@@ -132,15 +133,33 @@ class FirebaseService {
     }
   }
 
-  /// Persists the name + country chosen after Google sign-in.
+  /// Persists the name + country chosen after Google sign-in, then pushes any
+  /// runs the player already completed as a guest (their Chapter-1 deaths +
+  /// time) up to the leaderboard.
   Future<void> saveProfile({required String name, required String country}) async {
     await SaveService.instance
         .setProfile(name: name, country: country, email: _user?.email ?? '');
     await _writeUserDoc();
+    await uploadLocalScores();
   }
 
-  /// Writes the run to scores/{uid}_{level} only when it beats the stored one
-  /// (fewer deaths, tie-break faster time). Requires a Google account.
+  /// One-shot migration: send every locally-recorded chapter result to the
+  /// leaderboard. Runs right after a guest upgrades to Google so their earlier
+  /// progress isn't lost.
+  Future<void> uploadLocalScores() async {
+    if (!isSignedIn) return;
+    for (var i = 0; i < levels.length; i++) {
+      final t = SaveService.instance.bestTimeMs(i);
+      final d = SaveService.instance.bestDeaths(i);
+      if (t != null && d != null) {
+        await submitScore(level: i, timeMs: t, deaths: d);
+      }
+    }
+  }
+
+  /// Writes the run to scores/{uid}_{level}, always overwriting the previous
+  /// one — the newest attempt is the only one that counts ("deaths & reborn":
+  /// your latest life is who you are now). Requires a Google account.
   Future<void> submitScore({
     required int level,
     required int timeMs,
@@ -150,16 +169,10 @@ class FirebaseService {
     final id = uid;
     if (id == null) return;
     try {
-      final ref =
-          FirebaseFirestore.instance.collection('scores').doc('${id}_$level');
-      final prev = (await ref.get()).data();
-      if (prev != null) {
-        final pd = prev['deaths'] as int? ?? 1 << 30;
-        final pt = prev['timeMs'] as int? ?? 1 << 30;
-        final worse = deaths > pd || (deaths == pd && timeMs >= pt);
-        if (worse) return; // keep the better run
-      }
-      await ref.set({
+      await FirebaseFirestore.instance
+          .collection('scores')
+          .doc('${id}_$level')
+          .set({
         'uid': id,
         'level': level,
         'deaths': deaths,
@@ -170,6 +183,41 @@ class FirebaseService {
       });
     } catch (e) {
       debugPrint('Score submit failed: $e');
+    }
+  }
+
+  /// Wipes the account: deletes every score row and the profile doc, removes
+  /// the Firebase Auth user, clears local profile, then drops back to a fresh
+  /// anonymous guest so the app keeps working. Returns false on failure.
+  Future<bool> deleteAccount() async {
+    if (!_ready) return false;
+    final id = uid;
+    if (id == null) return false;
+    try {
+      final db = FirebaseFirestore.instance;
+      final scores =
+          await db.collection('scores').where('uid', isEqualTo: id).get();
+      final batch = db.batch();
+      for (final doc in scores.docs) {
+        batch.delete(doc.reference);
+      }
+      batch.delete(db.collection('users').doc(id));
+      await batch.commit();
+      try {
+        await FirebaseAuth.instance.currentUser?.delete();
+      } on FirebaseAuthException catch (e) {
+        // requires-recent-login can block auth deletion, but the user's DATA is
+        // already gone, which is what matters for privacy. Sign them out.
+        debugPrint('Auth user delete deferred: ${e.code}');
+        await FirebaseAuth.instance.signOut();
+      }
+      await SaveService.instance.clearProfile();
+      await FirebaseAuth.instance.signInAnonymously(); // back to a guest
+      await _writeUserDoc();
+      return true;
+    } catch (e) {
+      debugPrint('Account deletion failed: $e');
+      return false;
     }
   }
 

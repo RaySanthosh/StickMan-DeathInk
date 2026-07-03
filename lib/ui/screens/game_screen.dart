@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../game/death_note_game.dart';
 import '../../game/levels_data.dart';
 import '../../game/scoring.dart';
+import '../../services/firebase_service.dart';
 import '../../services/save_service.dart';
 import '../../theme.dart';
 import '../widgets/notebook.dart';
@@ -368,6 +369,14 @@ class _CompleteOverlay extends StatelessWidget {
           'Time ${formatTime(result.timeMs)}   ·   ☠ ${result.deaths}',
           style: hand(22),
         ),
+        if (FirebaseService.instance.isSignedIn) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Your latest run counts — it replaces your leaderboard entry.',
+            textAlign: TextAlign.center,
+            style: hand(15, color: InkPalette.inkFaded),
+          ),
+        ],
         const SizedBox(height: 16),
         Row(
           mainAxisSize: MainAxisSize.min,
