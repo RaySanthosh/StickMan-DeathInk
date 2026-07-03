@@ -1,1 +1,25 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"stickman-deadink","appId":"1:192172141421:android:1cce12a4b3f92d48a60864","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"stickman-deadink","configurations":{"android":"1:192172141421:android:1cce12a4b3f92d48a60864"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "stickman-deadink",
+          "appId": "1:192172141421:android:1cce12a4b3f92d48a60864",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "stickman-deadink",
+          "configurations": {
+            "android": "1:192172141421:android:1cce12a4b3f92d48a60864"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
