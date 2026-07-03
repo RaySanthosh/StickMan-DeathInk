@@ -55,27 +55,10 @@ void main() {
     expect(log.first.levelIndex, 0);
   });
 
-  test('cloud progress merge keeps the better values', () async {
-    final save = SaveService.instance;
-    await save.recordResult(
-        level: 0, timeMs: 30000, deaths: 2, stars: 2, levelCount: 10);
-    await save.mergeProgress({
-      'unlocked': 4,
-      'level_0': {'stars': 3, 'timeMs': 25000, 'deaths': 0},
-      'level_2': {'stars': 1, 'timeMs': 90000, 'deaths': 9},
-    }, 10);
-    expect(save.unlocked, 4);
-    expect(save.starsFor(0), 3);
-    expect(save.bestTimeMs(0), 25000);
-    expect(save.starsFor(2), 1);
-
-    // local better values survive a worse cloud snapshot
-    await save.mergeProgress({
-      'unlocked': 1,
-      'level_0': {'stars': 1, 'timeMs': 99000, 'deaths': 9},
-    }, 10);
-    expect(save.unlocked, 4);
-    expect(save.starsFor(0), 3);
-    expect(save.bestTimeMs(0), 25000);
+  test('cleanName trims, caps length and blocks profanity', () {
+    expect(SaveService.cleanName('  Neo  '), 'Neo');
+    expect(SaveService.cleanName('waytoolongusername'), 'waytoolonguser'); // 14
+    expect(SaveService.cleanName(''), 'Stickman');
+    expect(SaveService.cleanName('shithead'), 'Stickman');
   });
 }

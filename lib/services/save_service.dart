@@ -114,12 +114,29 @@ class SaveService {
   String get email => _prefs.getString('email') ?? '';
   String get country => _prefs.getString('country') ?? '';
 
+  static const _banned = [
+    'fuck', 'shit', 'bitch', 'cunt', 'nigger', 'faggot', 'asshole', 'rape'
+  ];
+
+  /// Trims, collapses whitespace, strips control chars, caps at 14 chars and
+  /// blocks a small profanity list before a name is shown publicly.
+  static String cleanName(String raw) {
+    var s = raw
+        .replaceAll(RegExp(r'[\x00-\x1F]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (s.length > 14) s = s.substring(0, 14);
+    final lower = s.toLowerCase();
+    if (s.isEmpty || _banned.any(lower.contains)) return 'Stickman';
+    return s;
+  }
+
   Future<void> setProfile({
     required String name,
     required String country,
     required String email,
   }) async {
-    await _prefs.setString('nickname', name);
+    await _prefs.setString('nickname', cleanName(name));
     await _prefs.setString('country', country);
     await _prefs.setString('email', email);
     await _prefs.setBool('signedIn', true);
@@ -131,40 +148,4 @@ class SaveService {
     await _prefs.remove('country');
   }
 
-  // ---- cloud sync helpers ----
-  Map<String, dynamic> progressSnapshot(int levelCount) => {
-        'unlocked': unlocked,
-        'totalDeaths': totalDeaths,
-        for (var i = 0; i < levelCount; i++)
-          if (starsFor(i) > 0)
-            'level_$i': {
-              'stars': starsFor(i),
-              'timeMs': bestTimeMs(i),
-              'deaths': bestDeaths(i),
-            },
-      };
-
-  /// Merges cloud progress into local (keeps whichever is better).
-  Future<void> mergeProgress(Map<String, dynamic> cloud, int levelCount) async {
-    final cloudUnlocked = cloud['unlocked'];
-    if (cloudUnlocked is int && cloudUnlocked > unlocked) {
-      await _prefs.setInt('unlocked', cloudUnlocked.clamp(0, levelCount - 1));
-    }
-    for (var i = 0; i < levelCount; i++) {
-      final data = cloud['level_$i'];
-      if (data is! Map<String, dynamic>) continue;
-      final stars = data['stars'];
-      final timeMs = data['timeMs'];
-      final deaths = data['deaths'];
-      if (stars is int && stars > starsFor(i)) await _prefs.setInt('stars_$i', stars);
-      final localTime = bestTimeMs(i);
-      if (timeMs is int && (localTime == null || timeMs < localTime)) {
-        await _prefs.setInt('bestTime_$i', timeMs);
-      }
-      final localDeaths = bestDeaths(i);
-      if (deaths is int && (localDeaths == null || deaths < localDeaths)) {
-        await _prefs.setInt('bestDeaths_$i', deaths);
-      }
-    }
-  }
 }

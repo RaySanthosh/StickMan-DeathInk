@@ -224,15 +224,15 @@ class FirebaseService {
   Future<List<ScoreEntry>> fetchLeaderboard(int level) async {
     if (!_ready) return [];
     try {
+      // Sort client-side (deaths, then time) so no Firestore composite index
+      // is required. Fine for a casual game's row counts; revisit with an
+      // index + server limit if a single chapter ever gets huge.
       final snap = await FirebaseFirestore.instance
           .collection('scores')
           .where('level', isEqualTo: level)
-          .orderBy('deaths')
-          .orderBy('timeMs')
-          .limit(50)
           .get();
       final me = uid;
-      return snap.docs.map((d) {
+      final entries = snap.docs.map((d) {
         final data = d.data();
         return ScoreEntry(
           name: (data['name'] as String?)?.trim().isNotEmpty == true
@@ -243,7 +243,11 @@ class FirebaseService {
           deaths: (data['deaths'] as int?) ?? 0,
           isMe: data['uid'] == me,
         );
-      }).toList();
+      }).toList()
+        ..sort((a, b) => a.deaths != b.deaths
+            ? a.deaths.compareTo(b.deaths)
+            : a.timeMs.compareTo(b.timeMs));
+      return entries.take(50).toList();
     } catch (e) {
       debugPrint('Leaderboard fetch failed: $e');
       return [];
