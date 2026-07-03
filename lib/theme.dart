@@ -13,6 +13,51 @@ class InkPalette {
   static const gold = Color(0xFFC9A227);
 }
 
+/// Shared, immutable [Paint] objects for in-game rendering. Reused every frame
+/// instead of being re-allocated in each component's `render()` — this removes
+/// the per-frame garbage that caused GC hitches. Never mutate these; if a draw
+/// needs a one-off variation, build a local Paint for it.
+class GamePaints {
+  GamePaints._();
+
+  static Paint _stroke(Color c, double w, [StrokeJoin? join, StrokeCap? cap]) {
+    final p = Paint()
+      ..color = c
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w;
+    if (join != null) p.strokeJoin = join;
+    if (cap != null) p.strokeCap = cap;
+    return p;
+  }
+
+  // fills
+  static final Paint paperFill = Paint()..color = InkPalette.paperShade;
+  static final Paint redFill = Paint()..color = InkPalette.redInk;
+  static final Paint graphiteFill = Paint()..color = InkPalette.graphite;
+  static final Paint inkFill = Paint()..color = InkPalette.ink;
+
+  // ink strokes at the widths the game actually uses
+  static final Paint ink1 = _stroke(InkPalette.ink, 1);
+  static final Paint ink2 = _stroke(InkPalette.ink, 2);
+  static final Paint ink24 =
+      _stroke(InkPalette.ink, 2.4, StrokeJoin.round);
+  static final Paint ink26 =
+      _stroke(InkPalette.ink, 2.6, StrokeJoin.round);
+  static final Paint ink3 =
+      _stroke(InkPalette.ink, 3, StrokeJoin.round, StrokeCap.round);
+  static final Paint inkFar3 = _stroke(
+      InkPalette.ink.withValues(alpha: 0.55), 3,
+      StrokeJoin.round, StrokeCap.round);
+
+  // hatching / faint marks
+  static final Paint hatch =
+      _stroke(InkPalette.graphite.withValues(alpha: 0.35), 1.2);
+  static final Paint hatch05 =
+      _stroke(InkPalette.graphite.withValues(alpha: 0.5), 1);
+  static final Paint inkFadedThin =
+      _stroke(InkPalette.inkFaded, 1.6);
+}
+
 ThemeData buildNotebookTheme() {
   const ink = InkPalette.ink;
   final base = ThemeData(

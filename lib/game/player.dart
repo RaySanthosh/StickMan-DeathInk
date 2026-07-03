@@ -23,10 +23,10 @@ class Player extends PositionComponent with HasGameReference<DeathNoteGame> {
   Player() : super(size: Vector2(26, 42), anchor: Anchor.topLeft);
 
   // --- locomotion tuning ---
-  static const walkSpeed = 145.0;
-  static const runSpeed = 255.0;
-  static const runRampTime = 0.55; // hold a direction this long to hit a sprint
-  static const groundAccel = 1600.0;
+  static const walkSpeed = 160.0;
+  static const runSpeed = 300.0;
+  static const runRampTime = 0.38; // hold a direction this long to hit a sprint
+  static const groundAccel = 1900.0; // reach top speed sooner -> feels snappier
   static const turnAccel = 1100.0; // reversing at speed is slower -> visible skid
   static const groundFriction = 1250.0; // letting go of input slides you to a stop
   static const airAccel = 960.0; // 60% air control
@@ -727,19 +727,9 @@ class Player extends PositionComponent with HasGameReference<DeathNoteGame> {
     Offset hand(double sh, double elBend) =>
         elbow(sh) + boneDir(sh + elBend) * _fArm;
 
-    final ink = Paint()
-      ..color = InkPalette.ink
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
+    final ink = GamePaints.ink3;
     // far-side limbs drawn fainter for depth
-    final inkFar = Paint()
-      ..color = InkPalette.ink.withValues(alpha: 0.55)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
+    final inkFar = GamePaints.inkFar3;
 
     void limb(Offset a, Offset mid, Offset end, Paint paint) {
       final path = Path()
@@ -787,8 +777,7 @@ class Player extends PositionComponent with HasGameReference<DeathNoteGame> {
     // head
     canvas.drawCircle(headC, _headR + 2.2, ink);
     // eye dot (faces travel direction)
-    canvas.drawCircle(headC + Offset(f * 2.8, -1),
-        1.4, Paint()..color = InkPalette.ink);
+    canvas.drawCircle(headC + Offset(f * 2.8, -1), 1.4, GamePaints.inkFill);
 
     if (entering) canvas.restore();
   }

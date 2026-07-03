@@ -1,0 +1,18 @@
+# Copy this file to  android/key.properties  and fill in your real values.
+# key.properties is git-ignored (it holds secrets) — never commit the real one.
+#
+# 1. Create a keystore (once), keep the .jks file somewhere safe and BACK IT UP:
+#      keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 \
+#              -validity 10000 -alias upload
+#
+# 2. Get its release SHA-1 and add it to Firebase
+#    (Project settings -> your Android app -> Add fingerprint, then re-download
+#     google-services.json). Without this, Google sign-in fails in release:
+#      keytool -list -v -keystore upload-keystore.jks -alias upload
+#
+# 3. Fill in the four values below and save as key.properties.
+
+storeFile=C:/path/to/upload-keystore.jks
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=upload
+keyPassword=YOUR_KEY_PASSWORD

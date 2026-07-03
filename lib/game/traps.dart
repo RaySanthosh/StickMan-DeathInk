@@ -61,7 +61,7 @@ class Spike extends Trap {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.4
       ..strokeJoin = StrokeJoin.round;
-    final fill = Paint()..color = InkPalette.paperShade;
+    final fill = GamePaints.paperFill;
     const t = Level.tileSize;
     final path = Path();
     for (var i = 0; i < 3; i++) {
@@ -81,10 +81,10 @@ class Spike extends Trap {
     path.close();
     canvas.drawPath(path, fill);
     canvas.drawPath(path, ink);
-    final tips = Paint()..color = InkPalette.redInk;
     for (var i = 0; i < 3; i++) {
       final tipY = up ? t - (t * 0.72) * raise : (t * 0.72) * raise;
-      canvas.drawCircle(Offset(i * t / 3 + t / 6, tipY), 2.2, tips);
+      canvas.drawCircle(
+          Offset(i * t / 3 + t / 6, tipY), 2.2, GamePaints.redFill);
     }
   }
 }
@@ -254,10 +254,7 @@ class DartShooter extends PositionComponent
   @override
   void render(Canvas canvas) {
     const t = Level.tileSize;
-    final ink = Paint()
-      ..color = InkPalette.ink
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4;
+    final ink = GamePaints.ink24;
     // inkwell pot
     final pot = Path()
       ..moveTo(t * 0.3, t)
@@ -265,17 +262,14 @@ class DartShooter extends PositionComponent
       ..lineTo(t * 0.74, t * 0.62)
       ..lineTo(t * 0.7, t)
       ..close();
-    canvas.drawPath(pot, Paint()..color = InkPalette.paperShade);
+    canvas.drawPath(pot, GamePaints.paperFill);
     canvas.drawPath(pot, ink);
     canvas.drawLine(
         Offset(t * 0.22, t * 0.62), Offset(t * 0.78, t * 0.62), ink);
     // muzzle
     final muzzleX = dir > 0 ? t * 0.78 : t * 0.22;
-    canvas.drawCircle(
-        Offset(muzzleX, t * 0.72),
-        _warning ? 4.0 : 2.6,
-        Paint()
-          ..color = _warning ? InkPalette.redInk : InkPalette.graphite);
+    canvas.drawCircle(Offset(muzzleX, t * 0.72), _warning ? 4.0 : 2.6,
+        _warning ? GamePaints.redFill : GamePaints.graphiteFill);
   }
 }
 
@@ -392,18 +386,11 @@ class FakeFloor extends SteppableTile {
       canvas.translate(math.sin(_timer * 70) * 2, 0);
     }
     const rect = Rect.fromLTWH(0, 0, t, t);
-    canvas.drawRect(rect, Paint()..color = InkPalette.paperShade);
-    final hatch = Paint()
-      ..color = InkPalette.graphite.withValues(alpha: 0.35)
-      ..strokeWidth = 1.2;
+    canvas.drawRect(rect, GamePaints.paperFill);
     for (var x = -t; x < t; x += 13) {
-      canvas.drawLine(Offset(x, t), Offset(x + t, 0), hatch);
+      canvas.drawLine(Offset(x, t), Offset(x + t, 0), GamePaints.hatch);
     }
-    final ink = Paint()
-      ..color = InkPalette.ink
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-    canvas.drawRect(rect, ink);
+    canvas.drawRect(rect, GamePaints.ink3);
     // the hairline crack (the tell)
     final crack = Paint()
       ..color = InkPalette.ink.withValues(alpha: 0.7)
@@ -498,12 +485,8 @@ class Saw extends Trap {
     canvas.save();
     canvas.translate(radius, radius);
     canvas.rotate(spin);
-    final ink = Paint()
-      ..color = InkPalette.ink
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4;
-    final fill = Paint()..color = InkPalette.paperShade;
-    canvas.drawCircle(Offset.zero, radius - 4, fill);
+    final ink = GamePaints.ink24;
+    canvas.drawCircle(Offset.zero, radius - 4, GamePaints.paperFill);
     canvas.drawCircle(Offset.zero, radius - 4, ink);
     for (var i = 0; i < 8; i++) {
       final a = i * math.pi / 4;
@@ -511,7 +494,7 @@ class Saw extends Trap {
       final p2 = Offset(math.cos(a + 0.2), math.sin(a + 0.2)) * radius;
       canvas.drawLine(p1, p2, ink);
     }
-    canvas.drawCircle(Offset.zero, 3, Paint()..color = InkPalette.redInk);
+    canvas.drawCircle(Offset.zero, 3, GamePaints.redFill);
     canvas.restore();
   }
 }
@@ -648,17 +631,13 @@ class Crusher extends Trap {
 
   @override
   void render(Canvas canvas) {
-    final ink = Paint()
-      ..color = InkPalette.ink
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.6;
-    final fill = Paint()..color = InkPalette.paperShade;
+    final ink = GamePaints.ink26;
     final rect = Rect.fromLTWH(0, 0, size.x, size.y);
-    canvas.drawRect(rect, fill);
+    canvas.drawRect(rect, GamePaints.paperFill);
     canvas.drawRect(rect, ink);
     for (var x = -size.y; x < size.x; x += 9) {
-      canvas.drawLine(Offset(x, size.y), Offset(x + size.y, 0),
-          Paint()..color = InkPalette.graphite.withValues(alpha: 0.5)..strokeWidth = 1);
+      canvas.drawLine(
+          Offset(x, size.y), Offset(x + size.y, 0), GamePaints.hatch05);
     }
     final teeth = Path();
     for (var i = 0; i < 4; i++) {
@@ -668,8 +647,9 @@ class Crusher extends Trap {
       teeth.lineTo(x0 + size.x / 4, size.y);
     }
     canvas.drawPath(teeth, ink);
-    canvas.drawLine(Offset(size.x / 2, 0), Offset(size.x / 2, _homeY - position.y),
-        ink..strokeWidth = 2);
+    // separate static (never mutate the shared ink paint)
+    canvas.drawLine(Offset(size.x / 2, 0),
+        Offset(size.x / 2, _homeY - position.y), GamePaints.ink2);
   }
 }
 
@@ -746,15 +726,12 @@ class VanishingPlatform extends SteppableTile {
       final jitter = math.sin(_timer * 60) * 1.6;
       canvas.translate(jitter, 0);
     }
-    final ink = Paint()
-      ..color = InkPalette.ink
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4;
-    canvas.drawRect(rect, Paint()..color = InkPalette.paperShade);
+    final ink = GamePaints.ink24;
+    canvas.drawRect(rect, GamePaints.paperFill);
     canvas.drawRect(rect, ink);
     for (var x = 6.0; x < t - 6; x += 10) {
-      canvas.drawLine(Offset(x, 22), Offset(x + 5, 22),
-          Paint()..color = InkPalette.inkFaded..strokeWidth = 1.6);
+      canvas.drawLine(
+          Offset(x, 22), Offset(x + 5, 22), GamePaints.inkFadedThin);
     }
     canvas.restore();
   }
@@ -807,15 +784,12 @@ class LaserGate extends Trap {
   @override
   void render(Canvas canvas) {
     const t = Level.tileSize;
-    final ink = Paint()
-      ..color = InkPalette.ink
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4;
+    final ink = GamePaints.ink24;
     const housing = Rect.fromLTWH(t / 2 - 12, t - 18, 24, 18);
-    canvas.drawRect(housing, Paint()..color = InkPalette.paperShade);
+    canvas.drawRect(housing, GamePaints.paperFill);
     canvas.drawRect(housing, ink);
     canvas.drawCircle(const Offset(t / 2, t - 4), 3,
-        Paint()..color = firing ? InkPalette.redInk : InkPalette.graphite);
+        firing ? GamePaints.redFill : GamePaints.graphiteFill);
 
     final beamLen = _beamBottom - _beamTop;
     if (firing) {

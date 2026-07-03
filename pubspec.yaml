@@ -23,12 +23,33 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.1
+
+# App launcher icon. Regenerate with:  dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/image/icon_1024.png"
+  min_sdk_android: 23
+  adaptive_icon_background: "#FBF7EC"
+  adaptive_icon_foreground: "assets/image/icon_foreground.png"
+  remove_alpha_ios: true
+
+# Launch splash. Regenerate with:  dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#FBF7EC"
+  image: "assets/image/icon_foreground.png"
+  android_12:
+    color: "#FBF7EC"
+    image: "assets/image/icon_foreground.png"
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/audio/
+    - assets/image/
 
   fonts:
     - family: PatrickHand
