@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../game/death_note_game.dart';
 import '../../game/levels_data.dart';
 import '../../game/scoring.dart';
+import '../../game/taunts.dart';
 import '../../services/firebase_service.dart';
 import '../../services/save_service.dart';
 import '../../theme.dart';
@@ -23,6 +24,8 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   late final DeathNoteGame game;
   String _cause = '';
+  String _taunt = '';
+  String _clearMsg = '';
   LevelResult? _result;
 
   @override
@@ -31,11 +34,17 @@ class _GameScreenState extends State<GameScreen> {
     game = DeathNoteGame(
       levelIndex: widget.levelIndex,
       onDeathOverlay: (cause) {
-        setState(() => _cause = cause);
+        setState(() {
+          _cause = cause;
+          _taunt = Taunts.pickDeath(game.deaths, 'general'); // picked once
+        });
         game.overlays.add('death');
       },
       onCompleteOverlay: (result) {
-        setState(() => _result = result);
+        setState(() {
+          _result = result;
+          _clearMsg = Taunts.pickClear();
+        });
         game.overlays.add('complete');
       },
     );
@@ -66,6 +75,7 @@ class _GameScreenState extends State<GameScreen> {
               ),
           'death': (context, _) => _DeathOverlay(
                 cause: _cause,
+                taunt: _taunt,
                 deaths: game.deaths,
                 onRetry: () {
                   game.overlays.remove('death');
@@ -75,6 +85,7 @@ class _GameScreenState extends State<GameScreen> {
               ),
           'complete': (context, _) => _CompleteOverlay(
                 result: _result!,
+                clearMsg: _clearMsg,
                 onNext: () {
                   final next = _result!.levelIndex + 1;
                   Navigator.of(context).pushReplacement(MaterialPageRoute(
@@ -272,19 +283,22 @@ class _OverlayCard extends StatelessWidget {
     return Container(
       color: InkPalette.ink.withValues(alpha: 0.55),
       alignment: Alignment.center,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 22),
-        decoration: BoxDecoration(
-          color: InkPalette.paper,
-          border: Border.all(color: InkPalette.ink, width: 2.6),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(5),
-            bottomLeft: Radius.circular(6),
-            bottomRight: Radius.circular(18),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: SingleChildScrollView(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 22),
+          decoration: BoxDecoration(
+            color: InkPalette.paper,
+            border: Border.all(color: InkPalette.ink, width: 2.6),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(5),
+              bottomLeft: Radius.circular(6),
+              bottomRight: Radius.circular(18),
+            ),
           ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: children),
         ),
-        child: Column(mainAxisSize: MainAxisSize.min, children: children),
       ),
     );
   }
@@ -318,12 +332,14 @@ class _PauseOverlay extends StatelessWidget {
 class _DeathOverlay extends StatelessWidget {
   const _DeathOverlay({
     required this.cause,
+    required this.taunt,
     required this.deaths,
     required this.onRetry,
     required this.onQuit,
   });
 
   final String cause;
+  final String taunt;
   final int deaths;
   final VoidCallback onRetry;
   final VoidCallback onQuit;
@@ -334,9 +350,14 @@ class _DeathOverlay extends StatelessWidget {
       children: [
         Text('✖ DEATH #$deaths', style: caveat(46, color: InkPalette.redInk)),
         const SizedBox(height: 4),
-        Text('"$cause"', style: hand(24)),
-        Text('…written in the Note.',
-            style: hand(17, color: InkPalette.inkFaded)),
+        SizedBox(
+          width: 420,
+          child: Text(taunt,
+              textAlign: TextAlign.center,
+              style: hand(24, color: InkPalette.ink)),
+        ),
+        const SizedBox(height: 2),
+        Text('"$cause"', style: hand(16, color: InkPalette.inkFaded)),
         const SizedBox(height: 16),
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -358,12 +379,14 @@ class _DeathOverlay extends StatelessWidget {
 class _CompleteOverlay extends StatelessWidget {
   const _CompleteOverlay({
     required this.result,
+    required this.clearMsg,
     required this.onNext,
     required this.onReplay,
     required this.onQuit,
   });
 
   final LevelResult result;
+  final String clearMsg;
   final VoidCallback onNext;
   final VoidCallback onReplay;
   final VoidCallback onQuit;
@@ -372,10 +395,19 @@ class _CompleteOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasNext = result.levelIndex + 1 < levels.length &&
         result.levelIndex + 1 <= SaveService.instance.unlocked;
+    final isFinale = result.levelIndex == levels.length - 1;
     return _OverlayCard(
       children: [
-        Text('Chapter Complete!', style: caveat(44)),
+        Text(isFinale ? 'THE END?' : 'Chapter Complete!', style: caveat(44)),
         StarRow(stars: result.stars, size: 38),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: 440,
+          child: Text(isFinale ? Taunts.ending : clearMsg,
+              textAlign: TextAlign.center,
+              style: hand(isFinale ? 20 : 22,
+                  color: isFinale ? InkPalette.redInk : InkPalette.ink)),
+        ),
         const SizedBox(height: 6),
         Text(
           'Time ${formatTime(result.timeMs)}   ·   ☠ ${result.deaths}',

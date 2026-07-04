@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../data/countries.dart';
 import '../../services/firebase_service.dart';
@@ -28,9 +27,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Name/country entry is far easier to type in portrait.
-    SystemChrome.setPreferredOrientations(
-        [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
     if (FirebaseService.instance.isSignedIn) {
       _email = SaveService.instance.email;
     }
@@ -38,9 +34,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
-    // Back to the game's landscape lock on the way out.
-    SystemChrome.setPreferredOrientations(
-        [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     _nameCtrl.dispose();
     super.dispose();
   }

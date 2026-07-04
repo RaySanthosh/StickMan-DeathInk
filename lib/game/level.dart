@@ -219,6 +219,7 @@ class Level extends PositionComponent with HasGameReference<DeathNoteGame> {
     var a = attach;
     final start = (cell, a);
     var steps = 0;
+    const maxSteps = 400; // Safety limit to prevent infinite loops in malformed levels
     do {
       points.add(_railPos(cell, a));
       final t = (a.$2, -a.$1); // travel = rot90(attach)
@@ -233,7 +234,7 @@ class Level extends PositionComponent with HasGameReference<DeathNoteGame> {
         a = (-t.$1, -t.$2);
       }
       steps++;
-    } while ((cell, a) != start && steps < 400);
+    } while ((cell, a) != start && steps < maxSteps);
     return RailSaw(
       waypoints: points,
       speed: 100 + rng.nextDouble() * 90,

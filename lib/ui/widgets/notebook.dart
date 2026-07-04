@@ -117,15 +117,17 @@ class StarRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Optimized: Generate icons without rebuilding on every render
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: List.generate(3, (i) {
-        return Icon(
-          i < stars ? Icons.star : Icons.star_border,
-          size: size,
-          color: i < stars ? InkPalette.gold : InkPalette.inkFaded,
-        );
-      }),
+      children: [
+        for (var i = 0; i < 3; i++)
+          Icon(
+            i < stars ? Icons.star : Icons.star_border,
+            size: size,
+            color: i < stars ? InkPalette.gold : InkPalette.inkFaded,
+          ),
+      ],
     );
   }
 }
