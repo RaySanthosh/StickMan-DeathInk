@@ -1,8 +1,8 @@
-# Privacy Policy for Death Note: Ink Escape
+# Privacy Policy for Dead Ink
 
 **Last updated:** July 4, 2026
 
-Santhosh Iyappan ("we", "us", or "our") operates the Death Note: Ink Escape mobile application (the "App").
+Santhosh Iyappan ("we", "us", or "our") operates the Dead Ink mobile application (the "App").
 
 ## Information We Collect
 
