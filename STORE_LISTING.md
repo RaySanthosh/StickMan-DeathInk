@@ -1,7 +1,7 @@
-# Play Store Listing — Dead Ink
+# Play Store Listing — Death Ink
 
 ## App Name
-Dead Ink
+Death Ink
 
 ## Short Description (80 chars max)
 Dodge deadly traps in a hand-drawn notebook world. Every death gets written down.
@@ -9,13 +9,13 @@ Dodge deadly traps in a hand-drawn notebook world. Every death gets written down
 ## Full Description (4000 chars max)
 You are a stickman sketched in ink on notebook paper — and the page is trying to kill you.
 
-Run, jump, and dodge through hand-drawn levels filled with ink blots, eraser traps, pencil spikes, and paper-shredder hazards. Each chapter ups the stakes with new trap types and tighter timing. Die, and your name gets written in the Dead Ink notebook.
+Run, jump, and dodge through hand-drawn levels filled with ink blots, eraser traps, pencil spikes, and paper-shredder hazards. Each chapter ups the stakes with new trap types and tighter timing. Die, and your name gets written in the Death Ink notebook.
 
 FEATURES:
 • Hand-drawn notebook art style — every level looks like it was doodled in class
 • Multiple chapters with escalating difficulty
 • Unique trap types: ink splashes, eraser walls, pencil spikes, and more
-• Dead Ink mechanic — your failures are recorded in a creepy notebook
+• Death Ink mechanic — your failures are recorded in a creepy notebook
 • Global leaderboards — compete for the fewest deaths
 • Google Sign-In to save progress across devices
 • Offline play — no internet required to enjoy the game

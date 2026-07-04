@@ -1,8 +1,8 @@
-# Privacy Policy for Dead Ink
+# Privacy Policy for Death Ink
 
 **Last updated:** July 4, 2026
 
-Santhosh Iyappan ("we", "us", or "our") operates the Dead Ink mobile application (the "App").
+Santhosh Iyappan ("we", "us", or "our") operates the Death Ink mobile application (the "App").
 
 ## Information We Collect
 
