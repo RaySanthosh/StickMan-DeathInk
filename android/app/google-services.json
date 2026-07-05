@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "192172141421-em40sss6l4dd6qpon4frk2sjqfm6l3j1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.santhosh.death_note",
+            "certificate_hash": "440b0078da869d3ef7aef4a6fbfab94cf7483b88"
+          }
+        },
+        {
           "client_id": "192172141421-knvo35sk2vud00vfum8gmpq58chnpd9n.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'services/audio_service.dart';
 import 'services/firebase_service.dart';
+import 'services/notification_service.dart';
 import 'services/save_service.dart';
 import 'theme.dart';
 import 'ui/screens/title_screen.dart';
@@ -16,6 +17,7 @@ Future<void> main() async {
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   await SaveService.instance.init();
   await AudioService.instance.init();
+  await NotificationService.instance.init();
   // Cloud layer is optional — never block launch on it.
   // ignore: unawaited_futures
   FirebaseService.instance.init();

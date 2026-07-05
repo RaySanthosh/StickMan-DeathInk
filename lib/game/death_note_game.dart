@@ -44,6 +44,7 @@ class DeathNoteGame extends FlameGame with KeyboardEvents {
   bool _slidePressed = false;
 
   int deaths = 0;
+  String lastDeathKind = 'general'; // 'spike' | 'dart' | 'fall' | 'general'
   final clock = Stopwatch();
   Checkpoint? _checkpoint;
   bool _finished = false;
@@ -174,6 +175,18 @@ class DeathNoteGame extends FlameGame with KeyboardEvents {
     if (identical(causes, voidCauses) && _betrayal > 0) {
       causes = fakeFloorCauses; // fell through a crumbled fake floor
     }
+    // classify for the taunt pools (spike/dart/fall get flavoured roasts)
+    lastDeathKind = identical(causes, dartCauses)
+        ? 'dart'
+        : (identical(causes, voidCauses) || identical(causes, fakeFloorCauses))
+            ? 'fall'
+            : (identical(causes, spikeCauses) ||
+                    identical(causes, popSpikeCauses) ||
+                    identical(causes, barbCauses) ||
+                    identical(causes, sawCauses) ||
+                    identical(causes, railSawCauses))
+                ? 'spike'
+                : 'general';
     final cause = causes.isEmpty
         ? 'Died mysteriously.'
         : causes[_rng.nextInt(causes.length)];
@@ -203,7 +216,7 @@ class DeathNoteGame extends FlameGame with KeyboardEvents {
     audio.checkpoint();
   }
 
-  void completeLevel() {
+  Future<void> completeLevel() async {
     if (_finished) return;
     _finished = true;
     clock.stop();
@@ -213,15 +226,15 @@ class DeathNoteGame extends FlameGame with KeyboardEvents {
       deaths: deaths,
       parSeconds: levels[levelIndex].parSeconds * 0.8, // tighter 3-star bar
     );
-    SaveService.instance.recordResult(
+    final improved = await SaveService.instance.recordResult(
       level: levelIndex,
       timeMs: timeMs,
       deaths: deaths,
       stars: stars,
       levelCount: levels.length,
     );
-    FirebaseService.instance
-        .submitScore(level: levelIndex, timeMs: timeMs, deaths: deaths);
+    FirebaseService.instance.submitScore(
+        level: levelIndex, timeMs: timeMs, deaths: deaths, improved: improved);
     audio.win();
     onCompleteOverlay(LevelResult(
       levelIndex: levelIndex,

@@ -38,8 +38,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  bool get _signedIn => FirebaseService.instance.isSignedIn;
-
   Future<void> _google() async {
     setState(() => _busy = true);
     final email = await FirebaseService.instance.signInWithGoogle();
@@ -193,11 +191,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _busy
                           ? const _SignInLoader()
                           : InkButton(
-                              label: _signedIn ? 'Save' : 'Save & Join',
+                              label: FirebaseService.instance.isSignedIn
+                                  ? 'Save'
+                                  : 'Save & Join',
                               color: InkPalette.redInk,
                               onTap: _save,
                             ),
-                      if (_signedIn && !_busy) ...[
+                      if (FirebaseService.instance.isSignedIn && !_busy) ...[
                         const SizedBox(height: 24),
                         TextButton(
                           onPressed: _deleteAccount,

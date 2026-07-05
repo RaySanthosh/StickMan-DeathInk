@@ -7,6 +7,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../firebase_options.dart';
 import '../game/levels_data.dart';
 import 'messaging_service.dart';
+import 'notification_service.dart';
 import 'save_service.dart';
 
 class ScoreEntry {
@@ -190,6 +191,7 @@ class FirebaseService {
     await SaveService.instance
         .setProfile(name: name, country: country, email: _user?.email ?? '');
     await _writeUserDoc();
+    NotificationService.instance.welcome(SaveService.instance.nickname);
     await uploadLocalScores();
   }
 
@@ -214,6 +216,7 @@ class FirebaseService {
     required int level,
     required int timeMs,
     required int deaths,
+    bool improved = false,
   }) async {
     if (!isSignedIn) return; // leaderboard is Google-only
     final id = uid;
@@ -231,8 +234,28 @@ class FirebaseService {
         'country': SaveService.instance.country,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      await _notifyAfterScore(level, improved);
     } catch (e) {
       debugPrint('Score submit failed: $e');
+    }
+  }
+
+  /// Exactly ONE notification per completion, best first:
+  /// final chapter > top-3 rank > personal best > plain chapter clear.
+  Future<void> _notifyAfterScore(int level, bool improved) async {
+    final notify = NotificationService.instance;
+    if (level == levels.length - 1) {
+      await notify.gameCompleted();
+      return;
+    }
+    final board = await fetchLeaderboard(level);
+    final rank = board.indexWhere((e) => e.isMe);
+    if (rank >= 0 && rank < 3) {
+      await notify.topRank(rank + 1);
+    } else if (improved) {
+      await notify.personalBest();
+    } else {
+      await notify.chapterCleared();
     }
   }
 

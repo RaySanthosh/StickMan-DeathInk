@@ -36,7 +36,7 @@ class _GameScreenState extends State<GameScreen> {
       onDeathOverlay: (cause) {
         setState(() {
           _cause = cause;
-          _taunt = Taunts.pickDeath(game.deaths, 'general'); // picked once
+          _taunt = Taunts.pickDeath(game.deaths, game.lastDeathKind);
         });
         game.overlays.add('death');
       },
