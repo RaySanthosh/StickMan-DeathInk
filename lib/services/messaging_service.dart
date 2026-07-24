@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
@@ -9,18 +11,25 @@ class MessagingService {
   static final MessagingService instance = MessagingService._();
 
   String? token;
+  StreamSubscription<String>? _tokenSub;
 
   Future<void> init(void Function(String token) onToken) async {
     try {
+      await _tokenSub?.cancel();
       await FirebaseMessaging.instance.requestPermission();
       token = await FirebaseMessaging.instance.getToken();
       if (token != null) onToken(token!);
-      FirebaseMessaging.instance.onTokenRefresh.listen((t) {
+      _tokenSub = FirebaseMessaging.instance.onTokenRefresh.listen((t) {
         token = t;
         onToken(t);
       });
     } catch (e) {
       debugPrint('FCM init failed: $e');
     }
+  }
+
+  Future<void> dispose() async {
+    await _tokenSub?.cancel();
+    _tokenSub = null;
   }
 }

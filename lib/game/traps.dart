@@ -56,11 +56,7 @@ class Spike extends Trap {
   /// Shared spike drawing (also used by pop-up spikes / hanging barbs).
   static void paintSpikes(Canvas canvas,
       {required bool up, double raise = 1.0, bool red = false}) {
-    final ink = Paint()
-      ..color = red ? InkPalette.redInk : InkPalette.ink
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4
-      ..strokeJoin = StrokeJoin.round;
+    final ink = red ? GamePaints.spikeRedStroke : GamePaints.ink24;
     final fill = GamePaints.paperFill;
     const t = Level.tileSize;
     final path = Path();
@@ -183,8 +179,7 @@ class PopUpSpike extends Trap {
       case _PopUpState.hidden:
       case _PopUpState.cooling:
         // the tell: faint red specks on the floor
-        final specks = Paint()
-          ..color = InkPalette.redInk.withValues(alpha: 0.45);
+        final specks = GamePaints.popupSpecksFill;
         canvas.drawCircle(const Offset(t * 0.25, t - 4), 1.6, specks);
         canvas.drawCircle(const Offset(t * 0.55, t - 3), 1.3, specks);
         canvas.drawCircle(const Offset(t * 0.8, t - 5), 1.6, specks);
@@ -251,6 +246,9 @@ class DartShooter extends PositionComponent
           (player.center.x - cx).abs() < 640 &&
           (player.center.y - position.y).abs() < 320;
       if (!near) return;
+      // hard cap on live darts from this level — a stray edge case piling up
+      // shooters should never be able to flood the scene with flying darts.
+      if ((parent?.children.whereType<InkDart>().length ?? 0) >= 24) return;
       final rng = math.Random();
       parent?.add(InkDart(
         start: position +
@@ -260,19 +258,21 @@ class DartShooter extends PositionComponent
     }
   }
 
+  // inkwell pot outline — geometry only depends on the constant tile size,
+  // so it's identical across every DartShooter instance and frame.
+  static final Path _pot = Path()
+    ..moveTo(Level.tileSize * 0.3, Level.tileSize)
+    ..lineTo(Level.tileSize * 0.26, Level.tileSize * 0.62)
+    ..lineTo(Level.tileSize * 0.74, Level.tileSize * 0.62)
+    ..lineTo(Level.tileSize * 0.7, Level.tileSize)
+    ..close();
+
   @override
   void render(Canvas canvas) {
     const t = Level.tileSize;
     final ink = GamePaints.ink24;
-    // inkwell pot
-    final pot = Path()
-      ..moveTo(t * 0.3, t)
-      ..lineTo(t * 0.26, t * 0.62)
-      ..lineTo(t * 0.74, t * 0.62)
-      ..lineTo(t * 0.7, t)
-      ..close();
-    canvas.drawPath(pot, GamePaints.paperFill);
-    canvas.drawPath(pot, ink);
+    canvas.drawPath(_pot, GamePaints.paperFill);
+    canvas.drawPath(_pot, ink);
     canvas.drawLine(
         Offset(t * 0.22, t * 0.62), Offset(t * 0.78, t * 0.62), ink);
     // muzzle
@@ -318,15 +318,12 @@ class InkDart extends Trap {
 
   @override
   void render(Canvas canvas) {
-    final ink = Paint()
-      ..color = InkPalette.ink
-      ..strokeWidth = 2.4
-      ..strokeCap = StrokeCap.round;
+    final ink = GamePaints.dartStroke;
     final flip = velocity.x < 0 ? -1.0 : 1.0;
     canvas.save();
     canvas.translate(size.x / 2, size.y / 2);
     canvas.drawLine(Offset(-7 * flip, 0), Offset(6 * flip, 0), ink);
-    canvas.drawCircle(Offset(7 * flip, 0), 2, Paint()..color = InkPalette.redInk);
+    canvas.drawCircle(Offset(7 * flip, 0), 2, GamePaints.redFill);
     canvas.restore();
   }
 }
@@ -382,15 +379,21 @@ class FakeFloor extends SteppableTile {
     }
   }
 
+  // the hairline crack (the tell) — geometry only depends on the constant
+  // tile size, so it's identical across every FakeFloor instance and frame.
+  static final Path _crackPath = Path()
+    ..moveTo(Level.tileSize * 0.2, 2)
+    ..lineTo(Level.tileSize * 0.4, Level.tileSize * 0.3)
+    ..lineTo(Level.tileSize * 0.3, Level.tileSize * 0.55)
+    ..lineTo(Level.tileSize * 0.55, Level.tileSize * 0.8)
+    ..lineTo(Level.tileSize * 0.5, Level.tileSize - 2);
+
   @override
   void render(Canvas canvas) {
     const t = Level.tileSize;
     if (_state == _FloorState.gone) {
-      final ghost = Paint()
-        ..color = InkPalette.inkFaded.withValues(alpha: 0.2)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4;
-      canvas.drawRect(const Rect.fromLTWH(2, 2, t - 4, t - 4), ghost);
+      canvas.drawRect(const Rect.fromLTWH(2, 2, t - 4, t - 4),
+          GamePaints.fakeFloorGhostStroke);
       return;
     }
     canvas.save();
@@ -403,18 +406,7 @@ class FakeFloor extends SteppableTile {
       canvas.drawLine(Offset(x, t), Offset(x + t, 0), GamePaints.hatch);
     }
     canvas.drawRect(rect, GamePaints.ink3);
-    // the hairline crack (the tell)
-    final crack = Paint()
-      ..color = InkPalette.ink.withValues(alpha: 0.7)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-    final crackPath = Path()
-      ..moveTo(t * 0.2, 2)
-      ..lineTo(t * 0.4, t * 0.3)
-      ..lineTo(t * 0.3, t * 0.55)
-      ..lineTo(t * 0.55, t * 0.8)
-      ..lineTo(t * 0.5, t - 2);
-    canvas.drawPath(crackPath, crack);
+    canvas.drawPath(_crackPath, GamePaints.fakeFloorCrackStroke);
     canvas.restore();
   }
 }
@@ -641,6 +633,22 @@ class Crusher extends Trap {
         Rect.fromLTWH(position.x + 2, position.y, size.x - 4, size.y));
   }
 
+  // Crusher size is always Vector2(Level.tileSize - 4, Level.tileSize - 6) —
+  // a fixed constant — so the teeth geometry is identical across every
+  // Crusher instance and frame.
+  static final Path _teeth = () {
+    const w = Level.tileSize - 4;
+    const h = Level.tileSize - 6;
+    final path = Path();
+    for (var i = 0; i < 4; i++) {
+      final x0 = i * w / 4;
+      path.moveTo(x0, h);
+      path.lineTo(x0 + w / 8, h + 7);
+      path.lineTo(x0 + w / 4, h);
+    }
+    return path;
+  }();
+
   @override
   void render(Canvas canvas) {
     final ink = GamePaints.ink26;
@@ -651,14 +659,7 @@ class Crusher extends Trap {
       canvas.drawLine(
           Offset(x, size.y), Offset(x + size.y, 0), GamePaints.hatch05);
     }
-    final teeth = Path();
-    for (var i = 0; i < 4; i++) {
-      final x0 = i * size.x / 4;
-      teeth.moveTo(x0, size.y);
-      teeth.lineTo(x0 + size.x / 8, size.y + 7);
-      teeth.lineTo(x0 + size.x / 4, size.y);
-    }
-    canvas.drawPath(teeth, ink);
+    canvas.drawPath(_teeth, ink);
     // separate static (never mutate the shared ink paint)
     canvas.drawLine(Offset(size.x / 2, 0),
         Offset(size.x / 2, _homeY - position.y), GamePaints.ink2);
@@ -726,11 +727,7 @@ class VanishingPlatform extends SteppableTile {
     const t = Level.tileSize;
     const rect = Rect.fromLTWH(3, 6, t - 6, 12);
     if (_state == _PlatformState.gone) {
-      final ghost = Paint()
-        ..color = InkPalette.inkFaded.withValues(alpha: 0.25)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6;
-      canvas.drawRect(rect, ghost);
+      canvas.drawRect(rect, GamePaints.vanishingGhostStroke);
       return;
     }
     canvas.save();
@@ -805,20 +802,14 @@ class LaserGate extends Trap {
 
     final beamLen = _beamBottom - _beamTop;
     if (firing) {
-      final glow = Paint()
-        ..color = InkPalette.redInk.withValues(alpha: 0.25)
-        ..strokeWidth = 9;
-      final core = Paint()
-        ..color = InkPalette.redInk
-        ..strokeWidth = 3;
-      canvas.drawLine(const Offset(t / 2, t), Offset(t / 2, t + beamLen), glow);
-      canvas.drawLine(const Offset(t / 2, t), Offset(t / 2, t + beamLen), core);
+      canvas.drawLine(const Offset(t / 2, t), Offset(t / 2, t + beamLen),
+          GamePaints.laserGlow);
+      canvas.drawLine(const Offset(t / 2, t), Offset(t / 2, t + beamLen),
+          GamePaints.laserCore);
     } else {
-      final warn = Paint()
-        ..color = InkPalette.redInk.withValues(alpha: 0.35)
-        ..strokeWidth = 1.6;
       for (var y = t; y < t + beamLen; y += 12) {
-        canvas.drawLine(Offset(t / 2, y), Offset(t / 2, y + 5), warn);
+        canvas.drawLine(
+            Offset(t / 2, y), Offset(t / 2, y + 5), GamePaints.laserWarn);
       }
     }
   }

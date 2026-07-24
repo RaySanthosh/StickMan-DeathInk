@@ -21,7 +21,7 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final DeathNoteGame game;
   String _cause = '';
   String _taunt = '';
@@ -31,6 +31,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     game = DeathNoteGame(
       levelIndex: widget.levelIndex,
       onDeathOverlay: (cause) {
@@ -60,6 +61,34 @@ class _GameScreenState extends State<GameScreen> {
     game.overlays.remove('pause');
     game.paused = false;
     if (game.player.alive) game.clock.start();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Restart the render/update loop; gameplay stays frozen for live play
+      // because game.paused is still true (the player taps Resume).
+      if (game.isMounted) game.resumeEngine();
+      return;
+    }
+    // Backgrounded (inactive / paused / hidden / detached).
+    // For live play, run the normal pause flow so returning shows the Resume
+    // gate instead of dropping the player mid-action.
+    final canPause = game.isLoaded &&
+        !game.paused &&
+        game.player.alive &&
+        !game.overlays.isActive('complete');
+    if (canPause) _pause();
+    // Halt the loop entirely in every state (including death/complete overlays)
+    // so nothing keeps burning CPU while the app is in the background.
+    if (game.isMounted) game.pauseEngine();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    game.clock.stop();
+    super.dispose();
   }
 
   @override
@@ -218,8 +247,11 @@ class _HudStats extends StatefulWidget {
 }
 
 class _HudStatsState extends State<_HudStats> {
-  late final Timer _ticker =
-      Timer.periodic(const Duration(milliseconds: 100), (_) => setState(() {}));
+  late final Timer _ticker = Timer.periodic(
+      const Duration(milliseconds: 100),
+      (_) {
+        if (!widget.game.paused && widget.game.player.alive) setState(() {});
+      });
 
   @override
   void dispose() {

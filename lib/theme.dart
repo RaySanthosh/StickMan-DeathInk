@@ -56,6 +56,25 @@ class GamePaints {
       _stroke(InkPalette.graphite.withValues(alpha: 0.5), 1);
   static final Paint inkFadedThin =
       _stroke(InkPalette.inkFaded, 1.6);
+
+  // trap-specific paints, hoisted out of per-frame render() calls
+  static final Paint spikeRedStroke =
+      _stroke(InkPalette.redInk, 2.4, StrokeJoin.round);
+  static final Paint popupSpecksFill =
+      Paint()..color = InkPalette.redInk.withValues(alpha: 0.45);
+  static final Paint dartStroke =
+      _stroke(InkPalette.ink, 2.4, null, StrokeCap.round);
+  static final Paint fakeFloorGhostStroke =
+      _stroke(InkPalette.inkFaded.withValues(alpha: 0.2), 1.4);
+  static final Paint fakeFloorCrackStroke =
+      _stroke(InkPalette.ink.withValues(alpha: 0.7), 1.2);
+  static final Paint vanishingGhostStroke =
+      _stroke(InkPalette.inkFaded.withValues(alpha: 0.25), 1.6);
+  static final Paint laserGlow =
+      _stroke(InkPalette.redInk.withValues(alpha: 0.25), 9);
+  static final Paint laserCore = _stroke(InkPalette.redInk, 3);
+  static final Paint laserWarn =
+      _stroke(InkPalette.redInk.withValues(alpha: 0.35), 1.6);
 }
 
 ThemeData buildNotebookTheme() {

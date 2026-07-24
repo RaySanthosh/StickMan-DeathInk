@@ -154,6 +154,9 @@ class DeathNoteGame extends FlameGame with KeyboardEvents {
 
   @override
   void update(double dt) {
+    // Clamp dt so a large gap (e.g. returning from background) can't spike
+    // physics, shake, or trap timers by a single huge step.
+    if (dt > 1 / 30) dt = 1 / 30;
     super.update(dt);
     if (_betrayal > 0) _betrayal -= dt;
     if (_shakeTime > 0) {
