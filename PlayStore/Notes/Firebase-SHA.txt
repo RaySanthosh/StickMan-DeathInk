@@ -1,0 +1,12 @@
+Release keystore fingerprints (android/app/death-note-release.jks, alias: death-note)
+
+SHA-1:   44:0B:00:78:DA:86:9D:3E:F7:AE:F4:A6:FB:FA:B9:4C:F7:48:3B:88
+SHA-256: F8:EB:F3:37:CC:0F:A6:47:8B:C2:C0:8C:E9:16:15:BC:6C:AF:B0:D8:5D:C9:75:C5:3C:A9:57:46:E3:53:68:16
+
+NOTE: This SHA-1 already matches the certificate_hash in android/app/google-services.json,
+so the release cert is already registered in Firebase. Still verify in the Firebase console
+(Project settings > Your app > SHA certificate fingerprints).
+
+IMPORTANT: If you enable Google Play App Signing (recommended), Google re-signs your app with
+THEIR key. You must then also add Play's "App signing key certificate" SHA-1 (from
+Play Console > Setup > App integrity) to Firebase, or Google Sign-In will fail for Play installs.

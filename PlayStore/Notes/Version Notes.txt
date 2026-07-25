@@ -1,0 +1,5 @@
+Version name: 1.0.0
+Version code: 1
+
+Release notes (first release):
+Initial release of Death Ink — a stickman precision platformer with 10 deadly chapters, a global leaderboard, and a god of death who mocks your every mistake.

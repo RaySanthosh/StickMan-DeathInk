@@ -198,13 +198,17 @@ class FirebaseService {
   /// One-shot migration: send every locally-recorded chapter result to the
   /// leaderboard. Runs right after a guest upgrades to Google so their earlier
   /// progress isn't lost.
+  ///
+  /// Migration is SILENT: [notify] is false so we don't spam the user with one
+  /// notification per already-cleared chapter, and we skip the per-level
+  /// leaderboard read that a notification would otherwise trigger.
   Future<void> uploadLocalScores() async {
     if (!isSignedIn) return;
     for (var i = 0; i < levels.length; i++) {
       final t = SaveService.instance.bestTimeMs(i);
       final d = SaveService.instance.bestDeaths(i);
       if (t != null && d != null) {
-        await submitScore(level: i, timeMs: t, deaths: d);
+        await submitScore(level: i, timeMs: t, deaths: d, notify: false);
       }
     }
   }
@@ -217,6 +221,7 @@ class FirebaseService {
     required int timeMs,
     required int deaths,
     bool improved = false,
+    bool notify = true,
   }) async {
     if (!isSignedIn) return; // leaderboard is Google-only
     final id = uid;
@@ -234,7 +239,9 @@ class FirebaseService {
         'country': SaveService.instance.country,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      await _notifyAfterScore(level, improved);
+      // Notification (and the leaderboard read it needs) only for live
+      // completions — the bulk sign-in migration passes notify: false.
+      if (notify) await _notifyAfterScore(level, improved);
     } catch (e) {
       debugPrint('Score submit failed: $e');
     }

@@ -30,7 +30,7 @@ class DeathNoteApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Death Note',
+      title: 'Death Ink',
       debugShowCheckedModeBanner: false,
       theme: buildNotebookTheme(),
       home: const TitleScreen(),

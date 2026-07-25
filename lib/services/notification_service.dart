@@ -18,6 +18,12 @@ class NotificationService {
   final _rng = Random();
   bool _ready = false;
 
+  /// Last time each notification title was shown, used to suppress the same
+  /// notification firing twice in quick succession (double-triggers, sign-in
+  /// migration bursts, etc.) so a single user never gets spammed.
+  final Map<String, DateTime> _lastShown = {};
+  static const _dedupWindow = Duration(seconds: 5);
+
   Future<void> init() async {
     try {
       await _plugin.initialize(
@@ -33,6 +39,11 @@ class NotificationService {
 
   Future<void> _show(String title, String body) async {
     if (!_ready) return;
+    // Rate-limit: drop an identical notification fired within the dedup window.
+    final now = DateTime.now();
+    final last = _lastShown[title];
+    if (last != null && now.difference(last) < _dedupWindow) return;
+    _lastShown[title] = now;
     try {
       await _plugin.show(
         id: _rng.nextInt(1 << 31),

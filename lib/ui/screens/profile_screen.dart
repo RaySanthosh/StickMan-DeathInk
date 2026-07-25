@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../data/countries.dart';
@@ -217,9 +215,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-/// Sign-in progress bar. Stays invisible for the first second (so quick
-/// sign-ins never flash a loader), then reveals a taunting percentage bar
-/// while the async work finishes.
+/// Sign-in progress bar. Shows immediately (so the user always sees that
+/// something is happening) with a taunting percentage bar and on-theme lines
+/// while the account is linked and the profile is fetched.
 class _SignInLoader extends StatefulWidget {
   const _SignInLoader();
 
@@ -230,30 +228,24 @@ class _SignInLoader extends StatefulWidget {
 class _SignInLoaderState extends State<_SignInLoader>
     with SingleTickerProviderStateMixin {
   static const _msgs = [
-    'Collecting lives data…',
-    'I guess I found you.',
+    'Writing your name in the Note…',
+    'Reading your soul…',
+    'So this is who you are.',
     "Let's see how you play this life.",
-    'Win me if you can.',
   ];
 
   late final AnimationController _c =
       AnimationController(vsync: this, duration: const Duration(seconds: 6))
         ..forward();
-  bool _visible = false;
-  late final Timer _reveal = Timer(const Duration(seconds: 1), () {
-    if (mounted) setState(() => _visible = true);
-  });
 
   @override
   void dispose() {
-    _reveal.cancel();
     _c.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_visible) return const SizedBox(height: 4);
     return AnimatedBuilder(
       animation: _c,
       builder: (context, _) {
