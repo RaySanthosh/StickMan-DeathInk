@@ -11,6 +11,7 @@ import '../../services/firebase_service.dart';
 import '../../services/save_service.dart';
 import '../../theme.dart';
 import '../widgets/notebook.dart';
+import 'profile_screen.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key, required this.levelIndex});
@@ -115,9 +116,31 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           'complete': (context, _) => _CompleteOverlay(
                 result: _result!,
                 clearMsg: _clearMsg,
-                onNext: () {
+                onNext: () async {
                   final next = _result!.levelIndex + 1;
-                  Navigator.of(context).pushReplacement(MaterialPageRoute(
+                  final navigator = Navigator.of(context);
+                  final messenger = ScaffoldMessenger.of(context);
+                  // Same gate as the chapter list: Chapter 2+ requires a Google
+                  // account. Finishing Chapter 1 must not slip a guest into the
+                  // next chapter via this button.
+                  if (next >= 1 && !FirebaseService.instance.isSignedIn) {
+                    final signedIn = await navigator.push<bool>(
+                      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                    );
+                    if (!mounted) return;
+                    if (signedIn != true &&
+                        !FirebaseService.instance.isSignedIn) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Sign in to continue past Chapter 1.',
+                              style: hand(18)),
+                        ),
+                      );
+                      return;
+                    }
+                  }
+                  if (!mounted) return;
+                  navigator.pushReplacement(MaterialPageRoute(
                       builder: (_) => GameScreen(levelIndex: next)));
                 },
                 onReplay: () {
